@@ -16,12 +16,23 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: {
+    error: "Muitas tentativas de reset. Tente novamente em 1 hora.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.post("/auth/login", loginLimiter, login);
 
 router.patch(
   "/users/:id/reset-password",
   authenticate,
   authorize(["SECRETARY"]),
+  resetPasswordLimiter,
   resetPassword,
 );
 

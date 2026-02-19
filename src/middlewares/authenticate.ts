@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { env } from "../config/env";
 import { JwtPayload } from "../types/auth";
-
-const JWT_SECRET = process.env.JWT_SECRET!;
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -14,7 +13,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.slice(7);
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 
     req.user = {
       id: payload.sub,
