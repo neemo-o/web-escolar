@@ -1,0 +1,661 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum Role {
+  ADMIN_GLOBAL
+  SECRETARY
+  TEACHER
+  STUDENT
+  GUARDIAN
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum EnrollmentStatus {
+  ATIVA
+  CONCLUIDA
+  CANCELADA
+  TRANSFERIDA
+  SUSPENSA
+  TRANCADA
+}
+
+enum AssessmentStatus {
+  RASCUNHO
+  PUBLICADA
+  ENCERRADA
+  ANULADA
+}
+
+enum ActivityStatus {
+  RASCUNHO
+  PUBLICADA
+  ENCERRADA
+  ACEITA_ATRASO
+  ARQUIVADA
+}
+
+enum AcademicYearStatus {
+  PLANEJAMENTO
+  EM_ANDAMENTO
+  ENCERRADO
+  ARQUIVADO
+}
+
+enum Shift {
+  MANHA
+  TARDE
+  NOTURNO
+  INTEGRAL
+}
+
+// =============================================================================
+// TENANT
+// =============================================================================
+
+model School {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(200)
+  cnpj      String    @unique @db.VarChar(18)
+  slug      String    @unique @db.VarChar(100)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  config             SchoolConfig?
+  academicYears      AcademicYear[]
+  gradeLevels        GradeLevel[]
+  subjects           Subject[]
+  classrooms         Classroom[]
+  students           Student[]
+  assessments        Assessment[]
+  activities         Activity[]
+  attendanceSessions AttendanceSession[]
+  announcements      Announcement[]
+  schoolEvents       SchoolEvent[]
+  studentGuardians   StudentGuardian[]
+  users              User[]
+
+  @@map("schools")
+}
+
+model SchoolConfig {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+
+  timezone String @default("America/Sao_Paulo") @db.VarChar(60)
+  locale   String @default("pt-BR") @db.VarChar(10)
+
+  primaryColor   String? @db.VarChar(7)
+  secondaryColor String? @db.VarChar(7)
+  logoUrl        String?
+  displayName    String? @db.VarChar(200)
+
+  periodType     String  @default("bimestre") @db.VarChar(20)
+  periodsPerYear Int     @default(4)
+  passingGrade   Decimal @default(60.0) @db.Decimal(5, 2)
+  gradeScale     Decimal @default(100.0) @db.Decimal(5, 2)
+  recoveryGrade  Decimal? @db.Decimal(5, 2)
+  decimalPlaces  Int     @default(1)
+
+  minAttendancePct    Decimal @default(75.0) @db.Decimal(5, 2)
+  countAbsenceType    String  @default("por_aula") @db.VarChar(20)
+  justifyAbsenceLimit Int     @default(10)
+
+  allowGradeEditAfterClose  Boolean @default(false)
+  allowLateEnrollment       Boolean @default(false)
+  requireGuardianApproval   Boolean @default(false)
+  notifyGradeLaunch         Boolean @default(true)
+  notifyAbsence             Boolean @default(true)
+  notifyFrequencyThreshold  Decimal @default(80.0) @db.Decimal(5, 2)
+
+  directorName  String? @db.VarChar(200)
+  directorTitle String? @default("Diretor(a)") @db.VarChar(100)
+
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@map("school_configs")
+}
+
+// =============================================================================
+// USUÁRIOS E CONTROLE DE ACESSO
+// =============================================================================
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  schoolId        String?   @db.Uuid
+  email           String    @db.VarChar(255)
+  passwordHash    String    @db.VarChar(255)
+  name            String    @db.VarChar(200)
+  phone           String?   @db.VarChar(20)
+  avatarUrl       String?
+  emailVerifiedAt DateTime?
+  role            Role
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  school               School?              @relation(fields: [schoolId], references: [id])
+  studentProfile       Student?             @relation("StudentUser")
+  classroomTeachings   ClassroomTeacher[]   @relation("TeacherInClassroom")
+  gradeLaunches        StudentGrade[]       @relation("GradeLaunchedBy")
+  attendanceSessions   AttendanceSession[]  @relation("SessionCreatedBy")
+  activitiesCreated    Activity[]           @relation("ActivityCreatedBy")
+  assessmentsCreated   Assessment[]         @relation("AssessmentCreatedBy")
+  submissionFeedbacks  ActivitySubmission[] @relation("FeedbackBy")
+  guardianStudents     StudentGuardian[]    @relation("GuardianUser")
+  gradeAudits          GradeAudit[]         @relation("GradeAuditChangedBy")
+
+  @@unique([schoolId, email])
+  @@index([schoolId])
+  @@map("users")
+}
+
+// =============================================================================
+// ESTRUTURA ACADÊMICA
+// =============================================================================
+
+model AcademicYear {
+  id        String             @id @default(uuid()) @db.Uuid
+  schoolId  String             @db.Uuid
+  year      Int
+  startDate DateTime           @db.Date
+  endDate   DateTime           @db.Date
+  active    Boolean            @default(false)
+  status    AcademicYearStatus @default(PLANEJAMENTO)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  school      School      @relation(fields: [schoolId], references: [id])
+  periods     Period[]
+  classrooms  Classroom[]
+  enrollments Enrollment[]
+
+  @@unique([schoolId, year])
+  @@index([schoolId, active])
+  @@index([schoolId, status])
+  @@map("academic_years")
+}
+
+model Period {
+  id             String       @id @default(uuid()) @db.Uuid
+  schoolId       String       @db.Uuid
+  academicYearId String       @db.Uuid
+  name           String       @db.VarChar(50)
+  sequence       Int
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
+  status         PeriodStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+  assessments  Assessment[]
+  periodGrades PeriodGrade[]
+
+  @@unique([academicYearId, sequence])
+  @@index([schoolId, academicYearId])
+  @@map("periods")
+}
+
+model GradeLevel {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  name        String   @db.VarChar(100)
+  code        String   @db.VarChar(20)
+  description String?  @db.VarChar(255)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  classrooms Classroom[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("grade_levels")
+}
+
+model Subject {
+  id          String    @id @default(uuid()) @db.Uuid
+  schoolId    String    @db.Uuid
+  name        String    @db.VarChar(100)
+  code        String    @db.VarChar(20)
+  description String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  school            School             @relation(fields: [schoolId], references: [id])
+  classroomSubjects ClassroomSubject[]
+  classroomTeachers ClassroomTeacher[]
+  assessments       Assessment[]
+  schedules         Schedule[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("subjects")
+}
+
+model Classroom {
+  id             String    @id @default(uuid()) @db.Uuid
+  schoolId       String    @db.Uuid
+  academicYearId String    @db.Uuid
+  gradeLevelId   String    @db.Uuid
+  name           String    @db.VarChar(50)
+  shift          Shift
+  capacity       Int
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  school             School             @relation(fields: [schoolId], references: [id])
+  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id])
+  gradeLevel         GradeLevel         @relation(fields: [gradeLevelId], references: [id])
+  classroomSubjects  ClassroomSubject[]
+  classroomTeachers  ClassroomTeacher[]
+  schedules          Schedule[]
+  enrollments        Enrollment[]
+  assessments        Assessment[]
+  activities         Activity[]
+  attendanceSessions AttendanceSession[]
+
+  @@unique([schoolId, academicYearId, name])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, gradeLevelId])
+  @@map("classrooms")
+}
+
+model ClassroomSubject {
+  id            String    @id @default(uuid()) @db.Uuid
+  schoolId      String    @db.Uuid
+  classroomId   String    @db.Uuid
+  subjectId     String    @db.Uuid
+  workloadHours Int?
+  isRequired    Boolean   @default(true)
+  dateFrom      DateTime  @db.Date
+  dateTo        DateTime? @db.Date
+  removedReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+
+  @@index([schoolId, classroomId])
+  @@map("classroom_subjects")
+}
+
+model ClassroomTeacher {
+  id           String    @id @default(uuid()) @db.Uuid
+  schoolId     String    @db.Uuid
+  classroomId  String    @db.Uuid
+  subjectId    String    @db.Uuid
+  teacherId    String    @db.Uuid
+  dateFrom     DateTime  @db.Date
+  dateTo       DateTime? @db.Date
+  reasonChange String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+  teacher   User      @relation("TeacherInClassroom", fields: [teacherId], references: [id])
+
+  @@index([schoolId, classroomId])
+  @@index([schoolId, teacherId])
+  @@map("classroom_teachers")
+}
+
+model Schedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  classroomId String   @db.Uuid
+  subjectId   String   @db.Uuid
+  dayOfWeek   Int
+  startTime   DateTime @db.Time()
+  endTime     DateTime @db.Time()
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+
+  @@index([schoolId, classroomId])
+  @@map("schedules")
+}
+
+// =============================================================================
+// ALUNOS E MATRÍCULAS
+// =============================================================================
+
+model Student {
+  id        String    @id @default(uuid()) @db.Uuid
+  schoolId  String    @db.Uuid
+  name      String    @db.VarChar(200)
+  cpf       String?   @db.VarChar(14)
+  birthDate DateTime? @db.Date
+  email     String?   @db.VarChar(255)
+  phone     String?   @db.VarChar(20)
+  address   String?   @db.VarChar(500)
+  avatarUrl String?
+  userId    String?   @unique @db.Uuid
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  school      School            @relation(fields: [schoolId], references: [id])
+  user        User?             @relation("StudentUser", fields: [userId], references: [id])
+  guardians   StudentGuardian[]
+  enrollments Enrollment[]
+
+  @@unique([schoolId, cpf])
+  @@index([schoolId])
+  @@index([schoolId, name])
+  @@map("students")
+}
+
+model StudentGuardian {
+  id         String   @id @default(uuid()) @db.Uuid
+  schoolId   String   @db.Uuid
+  studentId  String   @db.Uuid
+  guardianId String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian User    @relation("GuardianUser", fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, guardianId])
+  @@index([schoolId, studentId])
+  @@map("student_guardians")
+}
+
+model Enrollment {
+  id               String           @id @default(uuid()) @db.Uuid
+  schoolId         String           @db.Uuid
+  studentId        String           @db.Uuid
+  classroomId      String           @db.Uuid
+  academicYearId   String           @db.Uuid
+  enrollmentNumber String           @db.VarChar(20)
+  status           EnrollmentStatus @default(ATIVA)
+  enrolledAt       DateTime         @db.Date
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  student             Student              @relation(fields: [studentId], references: [id])
+  classroom           Classroom            @relation(fields: [classroomId], references: [id])
+  academicYear        AcademicYear         @relation(fields: [academicYearId], references: [id])
+  studentGrades       StudentGrade[]
+  periodGrades        PeriodGrade[]
+  finalGrades         FinalGrade[]
+  attendanceRecords   AttendanceRecord[]
+  activitySubmissions ActivitySubmission[]
+
+  @@unique([schoolId, enrollmentNumber])
+  @@unique([schoolId, studentId, academicYearId])
+  @@index([schoolId, academicYearId, status])
+  @@index([schoolId, studentId])
+  @@index([schoolId, classroomId])
+  @@map("enrollments")
+}
+
+// =============================================================================
+// AVALIAÇÕES E NOTAS
+// =============================================================================
+
+model Assessment {
+  id          String           @id @default(uuid()) @db.Uuid
+  schoolId    String           @db.Uuid
+  classroomId String           @db.Uuid
+  subjectId   String           @db.Uuid
+  periodId    String           @db.Uuid
+  createdById String           @db.Uuid
+  title       String           @db.VarChar(200)
+  type        String           @db.VarChar(50)
+  status      AssessmentStatus @default(RASCUNHO)
+  maxScore    Decimal          @db.Decimal(5, 2)
+  weight      Decimal          @default(1.0) @db.Decimal(4, 2)
+  date        DateTime         @db.Date
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  school        School         @relation(fields: [schoolId], references: [id])
+  classroom     Classroom      @relation(fields: [classroomId], references: [id])
+  subject       Subject        @relation(fields: [subjectId], references: [id])
+  period        Period         @relation(fields: [periodId], references: [id])
+  createdBy     User           @relation("AssessmentCreatedBy", fields: [createdById], references: [id])
+  studentGrades StudentGrade[]
+
+  @@index([schoolId, classroomId, periodId])
+  @@index([schoolId, classroomId, status])
+  @@map("assessments")
+}
+
+model StudentGrade {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  assessmentId String   @db.Uuid
+  enrollmentId String   @db.Uuid
+  score        Decimal? @db.Decimal(5, 2)
+  status       String   @default("lancada") @db.VarChar(30)
+  recordedById String   @db.Uuid
+  recordedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment  Assessment   @relation(fields: [assessmentId], references: [id])
+  enrollment  Enrollment   @relation(fields: [enrollmentId], references: [id])
+  recordedBy  User         @relation("GradeLaunchedBy", fields: [recordedById], references: [id])
+  gradeAudits GradeAudit[]
+
+  @@unique([assessmentId, enrollmentId])
+  @@index([schoolId, assessmentId])
+  @@index([schoolId, enrollmentId])
+  @@map("student_grades")
+}
+
+model GradeAudit {
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  studentGradeId String   @db.Uuid
+  oldValue       Decimal  @db.Decimal(5, 2)
+  newValue       Decimal  @db.Decimal(5, 2)
+  changedById    String   @db.Uuid
+  changedAt      DateTime @default(now())
+
+  studentGrade StudentGrade @relation(fields: [studentGradeId], references: [id], onDelete: Cascade)
+  changedBy    User         @relation("GradeAuditChangedBy", fields: [changedById], references: [id])
+
+  @@index([schoolId])
+  @@index([studentGradeId])
+  @@map("grade_audits")
+}
+
+model PeriodGrade {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  enrollmentId String   @db.Uuid
+  periodId     String   @db.Uuid
+  subjectId    String   @db.Uuid
+  grade        Decimal  @db.Decimal(5, 2)
+  absences     Int      @default(0)
+  calculatedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+  period     Period     @relation(fields: [periodId], references: [id])
+
+  @@unique([schoolId, enrollmentId, periodId, subjectId])
+  @@index([schoolId, enrollmentId])
+  @@map("period_grades")
+}
+
+model FinalGrade {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @db.Uuid
+  enrollmentId  String   @db.Uuid
+  subjectId     String   @db.Uuid
+  finalGrade    Decimal  @db.Decimal(5, 2)
+  totalAbsences Int      @default(0)
+  result        String   @db.VarChar(30)
+  calculatedAt  DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([enrollmentId, subjectId])
+  @@index([schoolId, enrollmentId])
+  @@map("final_grades")
+}
+
+// =============================================================================
+// FREQUÊNCIA
+// =============================================================================
+
+model AttendanceSession {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  classroomId String   @db.Uuid
+  subjectId   String   @db.Uuid
+  createdById String   @db.Uuid
+  sessionDate DateTime @db.Date
+  startTime   DateTime @db.Time()
+  endTime     DateTime @db.Time()
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school    School             @relation(fields: [schoolId], references: [id])
+  classroom Classroom          @relation(fields: [classroomId], references: [id])
+  createdBy User               @relation("SessionCreatedBy", fields: [createdById], references: [id])
+  records   AttendanceRecord[]
+
+  @@unique([schoolId, classroomId, subjectId, sessionDate, startTime])
+  @@index([schoolId, classroomId, sessionDate])
+  @@map("attendance_sessions")
+}
+
+model AttendanceRecord {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @db.Uuid
+  sessionId     String   @db.Uuid
+  enrollmentId  String   @db.Uuid
+  status        String   @db.VarChar(20)
+  justification String?
+  createdAt     DateTime @default(now())
+
+  session    AttendanceSession @relation(fields: [sessionId], references: [id])
+  enrollment Enrollment        @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([sessionId, enrollmentId])
+  @@index([schoolId, enrollmentId])
+  @@index([schoolId, sessionId])
+  @@map("attendance_records")
+}
+
+// =============================================================================
+// ATIVIDADES
+// =============================================================================
+
+model Activity {
+  id          String         @id @default(uuid()) @db.Uuid
+  schoolId    String         @db.Uuid
+  classroomId String         @db.Uuid
+  createdById String         @db.Uuid
+  title       String         @db.VarChar(200)
+  description String?
+  status      ActivityStatus @default(RASCUNHO)
+  dueDate     DateTime?
+  maxScore    Decimal?       @db.Decimal(5, 2)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  school      School               @relation(fields: [schoolId], references: [id])
+  classroom   Classroom            @relation(fields: [classroomId], references: [id])
+  createdBy   User                 @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  submissions ActivitySubmission[]
+
+  @@index([schoolId, classroomId, status])
+  @@index([schoolId, classroomId, dueDate])
+  @@map("activities")
+}
+
+model ActivitySubmission {
+  id           String    @id @default(uuid()) @db.Uuid
+  schoolId     String    @db.Uuid
+  activityId   String    @db.Uuid
+  enrollmentId String    @db.Uuid
+  content      String?
+  fileUrl      String?
+  score        Decimal?  @db.Decimal(5, 2)
+  feedback     String?
+  feedbackById String?   @db.Uuid
+  submittedAt  DateTime  @default(now())
+  reviewedAt   DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  activity   Activity   @relation(fields: [activityId], references: [id])
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+  feedbackBy User?      @relation("FeedbackBy", fields: [feedbackById], references: [id])
+
+  @@unique([activityId, enrollmentId])
+  @@index([schoolId, activityId])
+  @@index([schoolId, enrollmentId])
+  @@map("activity_submissions")
+}
+
+// =============================================================================
+// COMUNICAÇÃO (MVP)
+// =============================================================================
+
+model Announcement {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @db.Uuid
+  title     String   @db.VarChar(200)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@map("announcements")
+}
+
+model SchoolEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  schoolId    String    @db.Uuid
+  title       String    @db.VarChar(200)
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, startDate])
+  @@map("school_events")
+}
