@@ -1,12 +1,17 @@
 import express from "express";
-import cors from "cors";
+import authRoutes from "./modules/auth/auth.routes";
+import { authenticate } from "./middlewares/authenticate";
+import { requireActiveSchool } from "./middlewares/requireActiveSchool";
+import { requireTenantMatch } from "./middlewares/tenant";
 
-export const app = express();
+const app = express();
 
-app.use(cors());
 app.use(express.json());
 
-// Health check
-app.get("/health", (_, res) => {
-  return res.json({ status: "ok" });
-});
+app.use(authRoutes);
+
+app.use(authenticate);
+app.use(requireActiveSchool);
+app.use(requireTenantMatch);
+
+export { app };
