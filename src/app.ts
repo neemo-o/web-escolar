@@ -20,4 +20,8 @@ app.use(authenticate);
 app.use(requireActiveSchool);
 app.use(requireTenantMatch);
 
+// Routes that require authentication/tenant
+import academicYearsRoutes from "./modules/academic-years/academic-years.routes";
+app.use(academicYearsRoutes);
+
 export { app };
