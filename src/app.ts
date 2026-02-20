@@ -27,5 +27,7 @@ import periodsRoutes from "./modules/periods/periods.routes";
 app.use(periodsRoutes);
 import gradeLevelsRoutes from "./modules/grade-levels/grade-levels.routes";
 app.use(gradeLevelsRoutes);
+import subjectsRoutes from "./modules/subjects/subjects.routes";
+app.use(subjectsRoutes);
 
 export { app };
