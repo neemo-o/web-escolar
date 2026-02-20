@@ -1,12 +1,13 @@
 import { prisma } from "../../config/prisma";
+import { SessionFilters } from "./attendance.types";
 
 export function findSessions(
   schoolId: string,
-  filters: any,
+  filters: SessionFilters,
   skip = 0,
   take = 20,
 ) {
-  const where: any = { schoolId };
+  const where: any = { schoolId, deletedAt: null };
   if (filters.classroomId) where.classroomId = filters.classroomId;
   if (filters.subjectId) where.subjectId = filters.subjectId;
   if (filters.sessionDate)
@@ -19,17 +20,19 @@ export function findSessions(
   });
 }
 
-export function countSessions(schoolId: string, filters: any) {
-  const where: any = { schoolId };
-  if (filters.classroomId) where.classroomId = filters.classroomId;
-  if (filters.subjectId) where.subjectId = filters.subjectId;
-  if (filters.sessionDate)
+export function countSessions(schoolId: string, filters: SessionFilters) {
+  const where: any = { schoolId, deletedAt: null };
+  if (filters?.classroomId) where.classroomId = filters.classroomId;
+  if (filters?.subjectId) where.subjectId = filters.subjectId;
+  if (filters?.sessionDate)
     where.sessionDate = new Date(String(filters.sessionDate));
   return prisma.attendanceSession.count({ where });
 }
 
 export function findSessionById(id: string, schoolId: string) {
-  return prisma.attendanceSession.findFirst({ where: { id, schoolId } });
+  return prisma.attendanceSession.findFirst({
+    where: { id, schoolId, deletedAt: null },
+  });
 }
 
 export function createSession(data: any) {
@@ -43,7 +46,7 @@ export function updateSession(id: string, data: any) {
 export function softDeleteSession(id: string) {
   return prisma.attendanceSession.update({
     where: { id },
-    data: { updatedAt: new Date() },
+    data: { deletedAt: new Date() },
   });
 }
 

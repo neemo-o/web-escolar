@@ -14,6 +14,8 @@ declare global {
         schoolId: string | null;
         role: string;
       };
+      studentId?: string;
+      guardianStudentIds?: string[];
     }
   }
 }

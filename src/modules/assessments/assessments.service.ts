@@ -1,16 +1,21 @@
 import { prisma } from "../../config/prisma";
+import { AssessmentFilters } from "./assessments.types";
 
 export function findAssessments(
   schoolId: string,
-  filters: any,
+  filters: AssessmentFilters,
   skip = 0,
   take = 20,
 ) {
   const where: any = { schoolId };
-  if (filters.classroomId) where.classroomId = filters.classroomId;
-  if (filters.periodId) where.periodId = filters.periodId;
-  if (filters.subjectId) where.subjectId = filters.subjectId;
-  if (filters.status) where.status = filters.status;
+  if (filters?.classroomId) {
+    if (Array.isArray(filters.classroomId))
+      where.classroomId = { in: filters.classroomId };
+    else where.classroomId = filters.classroomId;
+  }
+  if (filters?.periodId) where.periodId = filters.periodId;
+  if (filters?.subjectId) where.subjectId = filters.subjectId;
+  if (filters?.status) where.status = filters.status;
 
   return prisma.assessment.findMany({
     where,
@@ -20,12 +25,16 @@ export function findAssessments(
   });
 }
 
-export function countAssessments(schoolId: string, filters: any) {
+export function countAssessments(schoolId: string, filters: AssessmentFilters) {
   const where: any = { schoolId };
-  if (filters.classroomId) where.classroomId = filters.classroomId;
-  if (filters.periodId) where.periodId = filters.periodId;
-  if (filters.subjectId) where.subjectId = filters.subjectId;
-  if (filters.status) where.status = filters.status;
+  if (filters?.classroomId) {
+    if (Array.isArray(filters.classroomId))
+      where.classroomId = { in: filters.classroomId };
+    else where.classroomId = filters.classroomId;
+  }
+  if (filters?.periodId) where.periodId = filters.periodId;
+  if (filters?.subjectId) where.subjectId = filters.subjectId;
+  if (filters?.status) where.status = filters.status;
 
   return prisma.assessment.count({ where });
 }

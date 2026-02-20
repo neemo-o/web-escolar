@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 import { env } from "../../config/env";
 import { generateTempPassword } from "../../utils/password";
 
@@ -56,20 +57,18 @@ export async function login(req: Request, res: Response) {
 }
 
 export async function resetPassword(req: Request, res: Response) {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const requester = req.user!;
 
   if (id === requester.id) {
-    return res
-      .status(403)
-      .json({
-        error: "Use o endpoint de troca de senha para alterar a própria senha",
-      });
+    return res.status(403).json({
+      error: "Use o endpoint de troca de senha para alterar a própria senha",
+    });
   }
 
   const target = await prisma.user.findFirst({
-    where: { id, schoolId: requester.schoolId, deletedAt: null },
-    select: { id: true, role: true },
+    where: { id, deletedAt: null },
+    select: { id: true, role: true, schoolId: true },
   });
 
   if (!target) {
@@ -81,6 +80,14 @@ export async function resetPassword(req: Request, res: Response) {
     return res
       .status(403)
       .json({ error: "Sem permissão para resetar senha deste usuário" });
+  }
+
+  if (requester.role !== "ADMIN_GLOBAL") {
+    if (target.schoolId !== requester.schoolId) {
+      return res
+        .status(403)
+        .json({ error: "Sem permissão para resetar senha deste usuário" });
+    }
   }
 
   const tempPassword = generateTempPassword();

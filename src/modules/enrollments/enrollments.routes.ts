@@ -10,8 +10,16 @@ import {
 const router = Router();
 
 router.post("/enrollments", authorize(["SECRETARY"]), createEnrollment);
-router.get("/enrollments", authorize(["SECRETARY"]), listEnrollments);
-router.get("/enrollments/:id", authorize(["SECRETARY"]), getEnrollment);
+router.get(
+  "/enrollments",
+  authorize(["SECRETARY", "STUDENT", "GUARDIAN"]),
+  listEnrollments,
+);
+router.get(
+  "/enrollments/:id",
+  authorize(["SECRETARY", "STUDENT", "GUARDIAN"]),
+  getEnrollment,
+);
 router.patch(
   "/enrollments/:id/status",
   authorize(["SECRETARY"]),

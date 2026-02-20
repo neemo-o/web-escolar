@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { getSchoolId } from "../../middlewares/tenant";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 import * as service from "./enrollments.service";
 import { nextEnrollmentNumber } from "../../utils/enrollmentCounter";
 
@@ -9,11 +10,9 @@ export async function createEnrollment(req: Request, res: Response) {
   const { studentId, classroomId, academicYearId } = req.body;
 
   if (!studentId || !classroomId || !academicYearId) {
-    return res
-      .status(400)
-      .json({
-        error: "studentId, classroomId e academicYearId são obrigatórios",
-      });
+    return res.status(400).json({
+      error: "studentId, classroomId e academicYearId são obrigatórios",
+    });
   }
 
   // validate student and classroom belong to school
@@ -91,6 +90,27 @@ export async function listEnrollments(req: Request, res: Response) {
     filters.academicYearId = String(req.query.academicYearId);
   if (req.query.status) filters.status = String(req.query.status);
 
+  const requester = req.user!;
+  if (requester.role === "STUDENT") {
+    const student = await prisma.student.findFirst({
+      where: { userId: requester.id, schoolId: requester.schoolId },
+      select: { id: true },
+    });
+    if (!student)
+      return res.status(403).json({ error: "Perfil de aluno não encontrado" });
+    filters.studentId = student.id;
+  } else if (requester.role === "GUARDIAN") {
+    const links = await prisma.studentGuardian.findMany({
+      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      select: { studentId: true },
+    });
+    if (!links || links.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhum aluno vinculado a este responsável" });
+    filters.studentId = links.map((l) => l.studentId);
+  }
+
   const [items, total] = await Promise.all([
     service.findEnrollments(schoolId, filters, skip, limit),
     service.countEnrollments(schoolId, filters),
@@ -101,16 +121,41 @@ export async function listEnrollments(req: Request, res: Response) {
 
 export async function getEnrollment(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const item = await service.findEnrollmentById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Matrícula não encontrada" });
+
+  const requester = req.user!;
+  if (requester.role === "STUDENT") {
+    const student = await prisma.student.findFirst({
+      where: { userId: requester.id, schoolId: requester.schoolId },
+      select: { id: true },
+    });
+    if (!student)
+      return res.status(403).json({ error: "Perfil de aluno não encontrado" });
+    if (item.studentId !== student.id)
+      return res
+        .status(403)
+        .json({ error: "Sem permissão para acessar esta matrícula" });
+  } else if (requester.role === "GUARDIAN") {
+    const links = await prisma.studentGuardian.findMany({
+      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      select: { studentId: true },
+    });
+    const studentIds = links.map((l) => l.studentId);
+    if (!studentIds.includes(item.studentId))
+      return res
+        .status(403)
+        .json({ error: "Sem permissão para acessar esta matrícula" });
+  }
+
   return res.json(item);
 }
 
 export async function updateEnrollmentStatus(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { status } = req.body;
 
   const allowed = [

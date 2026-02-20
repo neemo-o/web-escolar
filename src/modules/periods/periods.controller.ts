@@ -2,12 +2,11 @@ import { Request, Response } from "express";
 import * as service from "./periods.service";
 import { getSchoolId } from "../../middlewares/tenant";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 
 export async function createPeriod(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const yearId = Array.isArray(req.params.yearId)
-    ? req.params.yearId[0]
-    : req.params.yearId;
+  const yearId = getParam(req, "yearId");
   const { name, sequence, startDate, endDate } = req.body;
 
   if (!name || sequence == null || !startDate || !endDate) {
@@ -46,9 +45,7 @@ export async function createPeriod(req: Request, res: Response) {
 
 export async function listPeriods(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const yearId = Array.isArray(req.params.yearId)
-    ? req.params.yearId[0]
-    : req.params.yearId;
+  const yearId = getParam(req, "yearId");
 
   const year = await prisma.academicYear.findFirst({
     where: { id: yearId, schoolId },
@@ -64,10 +61,8 @@ export async function listPeriods(req: Request, res: Response) {
 
 export async function getPeriod(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const yearId = Array.isArray(req.params.yearId)
-    ? req.params.yearId[0]
-    : req.params.yearId;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const yearId = getParam(req, "yearId");
+  const id = getParam(req, "id");
 
   const year = await prisma.academicYear.findFirst({
     where: { id: yearId, schoolId },
@@ -85,10 +80,8 @@ export async function getPeriod(req: Request, res: Response) {
 
 export async function updatePeriod(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const yearId = Array.isArray(req.params.yearId)
-    ? req.params.yearId[0]
-    : req.params.yearId;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const yearId = getParam(req, "yearId");
+  const id = getParam(req, "id");
   const { name, startDate, endDate } = req.body;
 
   const year = await prisma.academicYear.findFirst({
@@ -113,10 +106,8 @@ export async function updatePeriod(req: Request, res: Response) {
 
 export async function updatePeriodStatus(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const yearId = Array.isArray(req.params.yearId)
-    ? req.params.yearId[0]
-    : req.params.yearId;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const yearId = getParam(req, "yearId");
+  const id = getParam(req, "id");
   const { status } = req.body;
 
   const allowed = ["OPEN", "CLOSED"];

@@ -12,10 +12,8 @@ app.use(express.json());
 
 // Schools routes must be registered before global tenant middlewares
 app.use(schoolsRoutes);
-
 app.use(authRoutes);
 app.use(usersRoutes);
-
 app.use(authenticate);
 app.use(requireActiveSchool);
 app.use(requireTenantMatch);

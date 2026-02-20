@@ -1,13 +1,12 @@
 import { Request, Response } from "express";
 import { getSchoolId } from "../../middlewares/tenant";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 import * as service from "./classroom-teachers.service";
 
 export async function addTeacherToClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const classroomId = Array.isArray(req.params.classroomId)
-    ? req.params.classroomId[0]
-    : req.params.classroomId;
+  const classroomId = getParam(req, "classroomId");
   const { teacherId, subjectId, dateFrom } = req.body;
 
   if (!teacherId || !subjectId || !dateFrom) {
@@ -59,9 +58,7 @@ export async function addTeacherToClassroom(req: Request, res: Response) {
 
 export async function listClassroomTeachers(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const classroomId = Array.isArray(req.params.classroomId)
-    ? req.params.classroomId[0]
-    : req.params.classroomId;
+  const classroomId = getParam(req, "classroomId");
 
   // ensure classroom belongs to school
   const classroom = await prisma.classroom.findFirst({
@@ -81,10 +78,8 @@ export async function listClassroomTeachers(req: Request, res: Response) {
 
 export async function removeClassroomTeacher(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const classroomId = Array.isArray(req.params.classroomId)
-    ? req.params.classroomId[0]
-    : req.params.classroomId;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const classroomId = getParam(req, "classroomId");
+  const id = getParam(req, "id");
   const { reasonChange } = req.body;
 
   const record = await service.findClassroomTeacherById(id, classroomId);

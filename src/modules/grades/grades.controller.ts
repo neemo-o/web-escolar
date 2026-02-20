@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { getSchoolId } from "../../middlewares/tenant";
 import * as service from "./grades.service";
+import getParam from "../../utils/getParam";
+import { prisma } from "../../config/prisma";
 
 export async function createOrUpdateGrade(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
@@ -33,9 +35,56 @@ export async function listGrades(req: Request, res: Response) {
 
   const filters: any = {};
   if (req.query.assessmentId)
-    filters.assessmentId = String(req.query.assessmentId);
+    filters.assessmentId = String(req.query.assessmentId) || undefined;
+  if ((req.params as any).assessmentId)
+    filters.assessmentId = String((req.params as any).assessmentId);
   if (req.query.enrollmentId)
-    filters.enrollmentId = String(req.query.enrollmentId);
+    filters.enrollmentId = String(req.query.enrollmentId) || undefined;
+  if ((req.params as any).enrollmentId)
+    filters.enrollmentId = String((req.params as any).enrollmentId);
+
+  const requester = req.user!;
+  if (requester.role === "STUDENT") {
+    const student = await prisma.student.findFirst({
+      where: { userId: requester.id, schoolId: requester.schoolId },
+    });
+    if (!student)
+      return res.status(403).json({ error: "Perfil de aluno não encontrado" });
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        schoolId: requester.schoolId,
+        status: "ATIVA",
+      },
+      select: { id: true },
+    });
+    const enrollmentIds = enrollments.map((e) => e.id);
+    if (enrollmentIds.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.enrollmentId = enrollmentIds;
+  } else if (requester.role === "GUARDIAN") {
+    const links = await prisma.studentGuardian.findMany({
+      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      select: { studentId: true },
+    });
+    if (!links || links.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhum aluno vinculado a este responsável" });
+    const studentIds = links.map((l) => l.studentId);
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        studentId: { in: studentIds },
+        schoolId: requester.schoolId,
+        status: "ATIVA",
+      },
+      select: { id: true },
+    });
+    const enrollmentIds = enrollments.map((e) => e.id);
+    if (enrollmentIds.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.enrollmentId = enrollmentIds;
+  }
 
   const [items, total] = await Promise.all([
     service.findGrades(schoolId, filters, skip, limit),
@@ -46,7 +95,7 @@ export async function listGrades(req: Request, res: Response) {
 
 export async function getGrade(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const item = await service.findGradeById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Grade not found" });
   return res.json(item);

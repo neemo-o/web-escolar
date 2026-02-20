@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import { getSchoolId } from "../../middlewares/tenant";
 import { generateTempPassword } from "../../utils/password";
 import * as service from "./students.service";
+import getParam from "../../utils/getParam";
+import { randomUUID } from "crypto";
 
 export async function createStudent(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
@@ -14,10 +16,12 @@ export async function createStudent(req: Request, res: Response) {
     const tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
+    const placeholderEmail = `student_${randomUUID()}@placeholder.internal`;
+
     const payload = {
       user: {
         schoolId,
-        email: email ?? null,
+        email: email ?? placeholderEmail,
         passwordHash,
         name,
         phone: phone ?? null,
@@ -65,7 +69,7 @@ export async function listStudents(req: Request, res: Response) {
 
 export async function getStudent(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const student = await service.findStudentById(id, schoolId);
   if (!student) return res.status(404).json({ error: "Aluno não encontrado" });
@@ -74,7 +78,7 @@ export async function getStudent(req: Request, res: Response) {
 
 export async function updateStudent(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { name, phone, address, avatarUrl } = req.body;
 
   const existing = await service.findStudentById(id, schoolId);
@@ -91,7 +95,7 @@ export async function updateStudent(req: Request, res: Response) {
 
 export async function deleteStudent(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const existing = await service.findStudentById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Aluno não encontrado" });

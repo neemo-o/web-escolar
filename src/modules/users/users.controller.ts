@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../../config/prisma";
 import { generateTempPassword } from "../../utils/password";
 import * as service from "./users.service";
+import getParam from "../../utils/getParam";
 
 export async function createUser(req: Request, res: Response) {
   const requester = req.user!;
@@ -20,16 +21,19 @@ export async function createUser(req: Request, res: Response) {
   if (isAdmin) {
     // allow admin to set schoolId (or null for global)
     schoolId = req.body.schoolId ?? null;
+    if ((role === "STUDENT" || role === "GUARDIAN") && !req.body.schoolId) {
+      return res
+        .status(400)
+        .json({ error: "schoolId é obrigatório para STUDENT e GUARDIAN" });
+    }
   } else {
     // secretary: always use their school
     schoolId = requester.schoolId!;
     const allowed = ["TEACHER", "STUDENT", "GUARDIAN"];
     if (!allowed.includes(role)) {
-      return res
-        .status(403)
-        .json({
-          error: "Secretaria só pode criar PROFESSOR, ESTUDANTE ou RESPONSÁVEL",
-        });
+      return res.status(403).json({
+        error: "Secretaria só pode criar PROFESSOR, ESTUDANTE ou RESPONSÁVEL",
+      });
     }
   }
 
@@ -89,7 +93,7 @@ export async function listUsers(req: Request, res: Response) {
 
 export async function getUser(req: Request, res: Response) {
   const requester = req.user!;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const extraWhere: any = { deletedAt: null };
   if (requester.role !== "ADMIN_GLOBAL")
@@ -103,7 +107,7 @@ export async function getUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const requester = req.user!;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { name, phone, avatarUrl } = req.body;
 
   const existing = await prisma.user.findFirst({
@@ -131,7 +135,7 @@ export async function updateUser(req: Request, res: Response) {
 
 export async function deactivateUser(req: Request, res: Response) {
   const requester = req.user!;
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const existing = await prisma.user.findFirst({
     where: { id, deletedAt: null },

@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { getSchoolId } from "../../middlewares/tenant";
 import * as service from "./attendance.service";
 import { prisma } from "../../config/prisma";
+import { SessionFilters } from "./attendance.types";
+import getParam from "../../utils/getParam";
 
 export async function createSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
@@ -50,12 +52,68 @@ export async function listSessions(req: Request, res: Response) {
   );
   const skip = (page - 1) * limit;
 
-  const filters: any = {};
+  const filters: SessionFilters = {};
   if (req.query.classroomId)
     filters.classroomId = String(req.query.classroomId);
   if (req.query.subjectId) filters.subjectId = String(req.query.subjectId);
   if (req.query.sessionDate)
     filters.sessionDate = String(req.query.sessionDate);
+
+  const requester = req.user!;
+  if (requester.role === "TEACHER") {
+    const links = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        schoolId: requester.schoolId,
+        dateTo: null,
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = links.map((l) => l.classroomId);
+    if (classroomIds.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.classroomId = classroomIds;
+  } else if (requester.role === "STUDENT") {
+    const student = await prisma.student.findFirst({
+      where: { userId: requester.id, schoolId: requester.schoolId },
+    });
+    if (!student)
+      return res.status(403).json({ error: "Perfil de aluno não encontrado" });
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        studentId: student.id,
+        schoolId: requester.schoolId,
+        status: "ATIVA",
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = enrollments.map((e) => e.classroomId);
+    if (classroomIds.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.classroomId = classroomIds;
+  } else if (requester.role === "GUARDIAN") {
+    const links = await prisma.studentGuardian.findMany({
+      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      select: { studentId: true },
+    });
+    if (!links || links.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhum aluno vinculado a este responsável" });
+    const studentIds = links.map((l) => l.studentId);
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        studentId: { in: studentIds },
+        schoolId: requester.schoolId,
+        status: "ATIVA",
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = enrollments.map((e) => e.classroomId);
+    if (classroomIds.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.classroomId = classroomIds;
+  }
 
   const [items, total] = await Promise.all([
     service.findSessions(schoolId, filters, skip, limit),
@@ -66,7 +124,7 @@ export async function listSessions(req: Request, res: Response) {
 
 export async function getSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const item = await service.findSessionById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Session not found" });
   return res.json(item);
@@ -74,7 +132,7 @@ export async function getSession(req: Request, res: Response) {
 
 export async function updateSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const existing = await service.findSessionById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Session not found" });
 
@@ -92,7 +150,7 @@ export async function updateSession(req: Request, res: Response) {
 
 export async function removeSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const existing = await service.findSessionById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Session not found" });
   await service.softDeleteSession(id);
@@ -101,9 +159,7 @@ export async function removeSession(req: Request, res: Response) {
 
 export async function markRecords(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const sessionId = Array.isArray(req.params.id)
-    ? req.params.id[0]
-    : req.params.id;
+  const sessionId = getParam(req, "id");
   const items: Array<{
     enrollmentId: string;
     status: string;

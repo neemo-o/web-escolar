@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as service from "./grade-levels.service";
+import getParam from "../../utils/getParam";
 import { getSchoolId } from "../../middlewares/tenant";
 
 export async function createGradeLevel(req: Request, res: Response) {
@@ -46,7 +47,7 @@ export async function listGradeLevels(req: Request, res: Response) {
 
 export async function getGradeLevel(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const item = await service.findGradeLevelById(id, schoolId);
   if (!item)
@@ -56,7 +57,7 @@ export async function getGradeLevel(req: Request, res: Response) {
 
 export async function updateGradeLevel(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { name, description, sortOrder } = req.body;
 
   const existing = await service.findGradeLevelById(id, schoolId);
@@ -73,7 +74,7 @@ export async function updateGradeLevel(req: Request, res: Response) {
 
 export async function deleteGradeLevel(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const existing = await service.findGradeLevelById(id, schoolId);
   if (!existing)

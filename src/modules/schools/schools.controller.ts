@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 
 export async function createSchool(req: Request, res: Response) {
   const { name, cnpj, slug } = req.body;
@@ -53,7 +54,7 @@ export async function listSchools(req: Request, res: Response) {
 }
 
 export async function getSchool(req: Request, res: Response) {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const school = await prisma.school.findFirst({
     where: { id, deletedAt: null },
@@ -66,7 +67,7 @@ export async function getSchool(req: Request, res: Response) {
 }
 
 export async function updateSchool(req: Request, res: Response) {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { name, cnpj, slug } = req.body;
 
   try {
@@ -92,7 +93,7 @@ export async function updateSchool(req: Request, res: Response) {
 }
 
 export async function activateSchool(req: Request, res: Response) {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const school = await prisma.school.findFirst({
     where: { id, deletedAt: null },
@@ -107,7 +108,7 @@ export async function activateSchool(req: Request, res: Response) {
 }
 
 export async function deactivateSchool(req: Request, res: Response) {
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const school = await prisma.school.findFirst({
     where: { id, deletedAt: null },

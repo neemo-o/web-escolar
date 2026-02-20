@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { CreateGradeData } from "./grades.types";
 
 export function findGrades(
   schoolId: string,
@@ -7,8 +8,16 @@ export function findGrades(
   take = 20,
 ) {
   const where: any = { schoolId };
-  if (filters.assessmentId) where.assessmentId = filters.assessmentId;
-  if (filters.enrollmentId) where.enrollmentId = filters.enrollmentId;
+  if (filters.assessmentId) {
+    if (Array.isArray(filters.assessmentId))
+      where.assessmentId = { in: filters.assessmentId };
+    else where.assessmentId = filters.assessmentId;
+  }
+  if (filters.enrollmentId) {
+    if (Array.isArray(filters.enrollmentId))
+      where.enrollmentId = { in: filters.enrollmentId };
+    else where.enrollmentId = filters.enrollmentId;
+  }
   return prisma.studentGrade.findMany({
     where,
     skip,
@@ -19,8 +28,16 @@ export function findGrades(
 
 export function countGrades(schoolId: string, filters: any) {
   const where: any = { schoolId };
-  if (filters.assessmentId) where.assessmentId = filters.assessmentId;
-  if (filters.enrollmentId) where.enrollmentId = filters.enrollmentId;
+  if (filters.assessmentId) {
+    if (Array.isArray(filters.assessmentId))
+      where.assessmentId = { in: filters.assessmentId };
+    else where.assessmentId = filters.assessmentId;
+  }
+  if (filters.enrollmentId) {
+    if (Array.isArray(filters.enrollmentId))
+      where.enrollmentId = { in: filters.enrollmentId };
+    else where.enrollmentId = filters.enrollmentId;
+  }
   return prisma.studentGrade.count({ where });
 }
 
@@ -28,9 +45,11 @@ export function findGradeById(id: string, schoolId: string) {
   return prisma.studentGrade.findFirst({ where: { id, schoolId } });
 }
 
-export async function createOrUpdateGrade(data: any, changedById: string) {
+export async function createOrUpdateGrade(
+  data: CreateGradeData,
+  changedById: string,
+) {
   const { assessmentId, enrollmentId, score } = data;
-
   const existing = await prisma.studentGrade.findFirst({
     where: { assessmentId, enrollmentId, schoolId: data.schoolId },
   });
@@ -40,19 +59,22 @@ export async function createOrUpdateGrade(data: any, changedById: string) {
     });
   }
 
-  // create audit
-  await prisma.gradeAudit.create({
-    data: {
-      schoolId: data.schoolId,
-      studentGradeId: existing.id,
-      oldValue: existing.score || 0,
-      newValue: score || 0,
-      changedById,
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.gradeAudit.create({
+      data: {
+        schoolId: data.schoolId,
+        studentGradeId: existing.id,
+        oldValue: existing.score ?? null,
+        newValue: score ?? null,
+        changedById,
+      },
+    });
+
+    return tx.studentGrade.update({
+      where: { id: existing.id },
+      data: { score, recordedById: changedById },
+    });
   });
 
-  return prisma.studentGrade.update({
-    where: { id: existing.id },
-    data: { score, recordedById: changedById },
-  });
+  return result;
 }

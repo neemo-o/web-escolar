@@ -2,18 +2,17 @@ import { Request, Response } from "express";
 import * as service from "./classrooms.service";
 import { getSchoolId } from "../../middlewares/tenant";
 import { prisma } from "../../config/prisma";
+import getParam from "../../utils/getParam";
 
 export async function createClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
   const { academicYearId, gradeLevelId, name, shift, capacity } = req.body;
 
   if (!academicYearId || !gradeLevelId || !name || !shift || capacity == null) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "academicYearId, gradeLevelId, name, shift e capacity são obrigatórios",
-      });
+    return res.status(400).json({
+      error:
+        "academicYearId, gradeLevelId, name, shift e capacity são obrigatórios",
+    });
   }
 
   // validate academicYear and gradeLevel belong to school
@@ -71,7 +70,7 @@ export async function listClassrooms(req: Request, res: Response) {
 
 export async function getClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const item = await service.findClassroomById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Classroom não encontrado" });
@@ -80,7 +79,7 @@ export async function getClassroom(req: Request, res: Response) {
 
 export async function updateClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { name, capacity, shift } = req.body;
 
   const existing = await service.findClassroomById(id, schoolId);
@@ -97,7 +96,7 @@ export async function updateClassroom(req: Request, res: Response) {
 
 export async function deleteClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const existing = await service.findClassroomById(id, schoolId);
   if (!existing)

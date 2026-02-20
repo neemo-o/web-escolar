@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as service from "./academic-years.service";
 import { getSchoolId } from "../../middlewares/tenant";
+import getParam from "../../utils/getParam";
 
 export async function createAcademicYear(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
@@ -46,7 +47,7 @@ export async function listAcademicYears(req: Request, res: Response) {
 
 export async function getAcademicYear(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const year = await service.findAcademicYearById(id, schoolId);
   if (!year)
@@ -57,7 +58,7 @@ export async function getAcademicYear(req: Request, res: Response) {
 
 export async function updateAcademicYear(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { startDate, endDate } = req.body;
 
   const existing = await service.findAcademicYearById(id, schoolId);
@@ -73,7 +74,7 @@ export async function updateAcademicYear(req: Request, res: Response) {
 
 export async function activateAcademicYear(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
 
   const existing = await service.findAcademicYearById(id, schoolId);
   if (!existing)
@@ -85,7 +86,7 @@ export async function activateAcademicYear(req: Request, res: Response) {
 
 export async function updateAcademicYearStatus(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = getParam(req, "id");
   const { status } = req.body;
 
   const allowed = ["PLANEJAMENTO", "EM_ANDAMENTO", "ENCERRADO", "ARQUIVADO"];
