@@ -23,5 +23,7 @@ app.use(requireTenantMatch);
 // Routes that require authentication/tenant
 import academicYearsRoutes from "./modules/academic-years/academic-years.routes";
 app.use(academicYearsRoutes);
+import periodsRoutes from "./modules/periods/periods.routes";
+app.use(periodsRoutes);
 
 export { app };
