@@ -33,5 +33,7 @@ import classroomsRoutes from "./modules/classrooms/classrooms.routes";
 app.use(classroomsRoutes);
 import classroomTeachersRoutes from "./modules/classroom-teachers/classroom-teachers.routes";
 app.use(classroomTeachersRoutes);
+import classroomSubjectsRoutes from "./modules/classroom-subjects/classroom-subjects.routes";
+app.use(classroomSubjectsRoutes);
 
 export { app };
