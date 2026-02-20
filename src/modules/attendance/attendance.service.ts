@@ -8,7 +8,11 @@ export function findSessions(
   take = 20,
 ) {
   const where: any = { schoolId };
-  if (filters.classroomId) where.classroomId = filters.classroomId;
+  if (filters.classroomId) {
+    where.classroomId = Array.isArray(filters.classroomId)
+      ? { in: filters.classroomId }
+      : filters.classroomId;
+  }
   if (filters.subjectId) where.subjectId = filters.subjectId;
   if (filters.sessionDate)
     where.sessionDate = new Date(String(filters.sessionDate));
@@ -22,7 +26,11 @@ export function findSessions(
 
 export function countSessions(schoolId: string, filters: SessionFilters) {
   const where: any = { schoolId };
-  if (filters?.classroomId) where.classroomId = filters.classroomId;
+  if (filters?.classroomId) {
+    where.classroomId = Array.isArray(filters.classroomId)
+      ? { in: filters.classroomId }
+      : filters.classroomId;
+  }
   if (filters?.subjectId) where.subjectId = filters.subjectId;
   if (filters?.sessionDate)
     where.sessionDate = new Date(String(filters.sessionDate));
@@ -42,7 +50,10 @@ export function updateSession(id: string, data: any) {
 }
 
 export function softDeleteSession(id: string) {
-  return prisma.attendanceSession.delete({ where: { id } });
+  return prisma.attendanceSession.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  });
 }
 
 export async function upsertRecord(

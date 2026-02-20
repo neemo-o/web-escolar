@@ -42,10 +42,61 @@ export async function listGrades(req: Request, res: Response) {
     filters.assessmentId = String((req.params as any).assessmentId);
   if (req.query.enrollmentId)
     filters.enrollmentId = String(req.query.enrollmentId) || undefined;
-  if ((req.params as any).enrollmentId)
-    filters.enrollmentId = String((req.params as any).enrollmentId);
+  const enrollmentIdParam = (req.params as any).enrollmentId
+    ? String((req.params as any).enrollmentId)
+    : undefined;
 
   const requester = req.user!;
+  // If enrollmentId is provided via URL param, validate ownership for STUDENT and GUARDIAN
+  if (enrollmentIdParam) {
+    if (requester.role === "STUDENT") {
+      const student = await prisma.student.findFirst({
+        where: {
+          userId: requester.id,
+          schoolId: requester.schoolId ?? undefined,
+        },
+      });
+      if (!student)
+        return res
+          .status(403)
+          .json({ error: "Perfil de aluno não encontrado" });
+      const enrollment = await prisma.enrollment.findFirst({
+        where: {
+          id: enrollmentIdParam,
+          studentId: student.id,
+          schoolId: requester.schoolId ?? undefined,
+        },
+      });
+      if (!enrollment) return res.status(403).json({ error: "Acesso negado" });
+      filters.enrollmentId = enrollmentIdParam;
+    } else if (requester.role === "GUARDIAN") {
+      const links = await prisma.studentGuardian.findMany({
+        where: {
+          guardianId: requester.id,
+          schoolId: requester.schoolId ?? undefined,
+        },
+        select: { studentId: true },
+      });
+      if (!links || links.length === 0)
+        return res
+          .status(403)
+          .json({ error: "Nenhum aluno vinculado a este responsável" });
+      const studentIds = links.map((l) => l.studentId);
+      const enrollment = await prisma.enrollment.findFirst({
+        where: {
+          id: enrollmentIdParam,
+          studentId: { in: studentIds },
+          schoolId: requester.schoolId ?? undefined,
+        },
+      });
+      if (!enrollment) return res.status(403).json({ error: "Acesso negado" });
+      filters.enrollmentId = enrollmentIdParam;
+    } else {
+      // other roles: allow param to be applied directly
+      filters.enrollmentId = enrollmentIdParam;
+    }
+  }
+
   if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
       where: {
@@ -66,7 +117,8 @@ export async function listGrades(req: Request, res: Response) {
     const enrollmentIds = enrollments.map((e) => e.id);
     if (enrollmentIds.length === 0)
       return res.json({ data: [], meta: { total: 0, page, limit } });
-    filters.enrollmentId = enrollmentIds;
+    // only apply the list filter when no specific enrollmentId param was provided
+    if (!enrollmentIdParam) filters.enrollmentId = enrollmentIds;
   } else if (requester.role === "GUARDIAN") {
     const links = await prisma.studentGuardian.findMany({
       where: {
@@ -91,7 +143,7 @@ export async function listGrades(req: Request, res: Response) {
     const enrollmentIds = enrollments.map((e) => e.id);
     if (enrollmentIds.length === 0)
       return res.json({ data: [], meta: { total: 0, page, limit } });
-    filters.enrollmentId = enrollmentIds;
+    if (!enrollmentIdParam) filters.enrollmentId = enrollmentIds;
   }
 
   const [items, total] = await Promise.all([

@@ -60,6 +60,22 @@ export async function listClassrooms(req: Request, res: Response) {
   if (req.query.gradeLevelId)
     filters.gradeLevelId = String(req.query.gradeLevelId);
 
+  const requester = req.user!;
+  if (requester.role === "TEACHER") {
+    const links = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        schoolId,
+        dateTo: null,
+      },
+      select: { classroomId: true },
+    });
+    const ids = links.map((l) => l.classroomId).filter(Boolean);
+    if (ids.length === 0)
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    filters.ids = ids;
+  }
+
   const [items, total] = await Promise.all([
     service.findClassrooms(schoolId, filters, skip, limit),
     service.countClassrooms(schoolId, filters),

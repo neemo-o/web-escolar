@@ -11,7 +11,7 @@ import {
 const router = Router();
 
 router.post("/classrooms", authorize(["SECRETARY"]), createClassroom);
-router.get("/classrooms", authorize(["SECRETARY"]), listClassrooms);
+router.get("/classrooms", authorize(["SECRETARY", "TEACHER"]), listClassrooms);
 router.get("/classrooms/:id", authorize(["SECRETARY"]), getClassroom);
 router.patch("/classrooms/:id", authorize(["SECRETARY"]), updateClassroom);
 router.delete("/classrooms/:id", authorize(["SECRETARY"]), deleteClassroom);
