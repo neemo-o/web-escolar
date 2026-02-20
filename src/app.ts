@@ -37,5 +37,13 @@ import classroomSubjectsRoutes from "./modules/classroom-subjects/classroom-subj
 app.use(classroomSubjectsRoutes);
 import studentsRoutes from "./modules/students/students.routes";
 app.use(studentsRoutes);
+import enrollmentsRoutes from "./modules/enrollments/enrollments.routes";
+app.use(enrollmentsRoutes);
+import assessmentsRoutes from "./modules/assessments/assessments.routes";
+app.use(assessmentsRoutes);
+import gradesRoutes from "./modules/grades/grades.routes";
+app.use(gradesRoutes);
+import attendanceRoutes from "./modules/attendance/attendance.routes";
+app.use(attendanceRoutes);
 
 export { app };

@@ -418,6 +418,20 @@ model Enrollment {
   @@map("enrollments")
 }
 
+// Counter for generating sequential enrollment numbers per school and year
+model EnrollmentCounter {
+  id         String   @id @default(uuid()) @db.Uuid
+  schoolId   String   @db.Uuid
+  year       Int
+  lastNumber Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([schoolId, year])
+  @@index([schoolId])
+  @@map("enrollment_counters")
+}
+
 // =============================================================================
 // AVALIAÇÕES E NOTAS
 // =============================================================================
