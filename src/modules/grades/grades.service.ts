@@ -64,8 +64,8 @@ export async function createOrUpdateGrade(
       data: {
         schoolId: data.schoolId,
         studentGradeId: existing.id,
-        oldValue: existing.score ?? null,
-        newValue: score ?? null,
+        oldValue: existing.score ?? 0,
+        newValue: score ?? 0,
         changedById,
       },
     });

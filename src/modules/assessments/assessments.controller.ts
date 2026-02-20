@@ -70,7 +70,7 @@ export async function listAssessments(req: Request, res: Response) {
     const links = await prisma.classroomTeacher.findMany({
       where: {
         teacherId: requester.id,
-        schoolId: requester.schoolId,
+        schoolId: requester.schoolId ?? undefined,
         dateTo: null,
       },
       select: { classroomId: true },
@@ -81,14 +81,17 @@ export async function listAssessments(req: Request, res: Response) {
     filters.classroomId = classroomIds;
   } else if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
-      where: { userId: requester.id, schoolId: requester.schoolId },
+      where: {
+        userId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
     });
     if (!student)
       return res.status(403).json({ error: "Perfil de aluno não encontrado" });
     const enrollments = await prisma.enrollment.findMany({
       where: {
         studentId: student.id,
-        schoolId: requester.schoolId,
+        schoolId: requester.schoolId ?? undefined,
         status: "ATIVA",
       },
       select: { classroomId: true },
@@ -99,7 +102,10 @@ export async function listAssessments(req: Request, res: Response) {
     filters.classroomId = classroomIds;
   } else if (requester.role === "GUARDIAN") {
     const links = await prisma.studentGuardian.findMany({
-      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      where: {
+        guardianId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { studentId: true },
     });
     if (!links || links.length === 0)
@@ -110,7 +116,7 @@ export async function listAssessments(req: Request, res: Response) {
     const enrollments = await prisma.enrollment.findMany({
       where: {
         studentId: { in: studentIds },
-        schoolId: requester.schoolId,
+        schoolId: requester.schoolId ?? undefined,
         status: "ATIVA",
       },
       select: { classroomId: true },

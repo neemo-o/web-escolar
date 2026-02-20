@@ -7,14 +7,14 @@ const router = Router();
 
 router.post(
   "/assessments/:assessmentId/grades",
-  authorize(["TEACHER", "SECRETARY"]),
+  authorize(["TEACHER"]),
   requireClassroomAccess,
   createOrUpdateGrade,
 );
 
 router.patch(
   "/assessments/:assessmentId/grades/:id",
-  authorize(["TEACHER", "SECRETARY"]),
+  authorize(["TEACHER"]),
   requireClassroomAccess,
   createOrUpdateGrade,
 );

@@ -93,7 +93,10 @@ export async function listEnrollments(req: Request, res: Response) {
   const requester = req.user!;
   if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
-      where: { userId: requester.id, schoolId: requester.schoolId },
+      where: {
+        userId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { id: true },
     });
     if (!student)
@@ -101,14 +104,45 @@ export async function listEnrollments(req: Request, res: Response) {
     filters.studentId = student.id;
   } else if (requester.role === "GUARDIAN") {
     const links = await prisma.studentGuardian.findMany({
-      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      where: {
+        guardianId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { studentId: true },
     });
     if (!links || links.length === 0)
       return res
         .status(403)
         .json({ error: "Nenhum aluno vinculado a este responsável" });
-    filters.studentId = links.map((l) => l.studentId);
+    const studentIds = links
+      .map((l) => l.studentId)
+      .filter((id): id is string => !!id);
+    if (studentIds.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhum aluno vinculado a este responsável" });
+    filters.studentId = studentIds;
+  } else if (requester.role === "TEACHER") {
+    const teacherClassrooms = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+        dateTo: null,
+      },
+      select: { classroomId: true },
+    });
+    if (!teacherClassrooms || teacherClassrooms.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhuma turma vinculada a este professor" });
+    const classroomIds = teacherClassrooms
+      .map((c) => c.classroomId)
+      .filter((id): id is string => !!id);
+    if (classroomIds.length === 0)
+      return res
+        .status(403)
+        .json({ error: "Nenhuma turma vinculada a este professor" });
+    filters.classroomId = { in: classroomIds };
   }
 
   const [items, total] = await Promise.all([
@@ -129,7 +163,10 @@ export async function getEnrollment(req: Request, res: Response) {
   const requester = req.user!;
   if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
-      where: { userId: requester.id, schoolId: requester.schoolId },
+      where: {
+        userId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { id: true },
     });
     if (!student)
@@ -140,11 +177,30 @@ export async function getEnrollment(req: Request, res: Response) {
         .json({ error: "Sem permissão para acessar esta matrícula" });
   } else if (requester.role === "GUARDIAN") {
     const links = await prisma.studentGuardian.findMany({
-      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      where: {
+        guardianId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { studentId: true },
     });
     const studentIds = links.map((l) => l.studentId);
     if (!studentIds.includes(item.studentId))
+      return res
+        .status(403)
+        .json({ error: "Sem permissão para acessar esta matrícula" });
+  } else if (requester.role === "TEACHER") {
+    const teacherClassrooms = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+        dateTo: null,
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = teacherClassrooms
+      .map((c) => c.classroomId)
+      .filter((id): id is string => !!id);
+    if (!item.classroomId || !classroomIds.includes(item.classroomId))
       return res
         .status(403)
         .json({ error: "Sem permissão para acessar esta matrícula" });

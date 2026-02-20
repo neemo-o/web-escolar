@@ -100,3 +100,58 @@ export async function resetPassword(req: Request, res: Response) {
 
   return res.json({ temporaryPassword: tempPassword });
 }
+
+export async function me(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: "Não autenticado" });
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      schoolId: true,
+      avatarUrl: true,
+      phone: true,
+    },
+  });
+
+  if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+  return res.json(user);
+}
+
+export async function changePassword(req: Request, res: Response) {
+  const requester = req.user!;
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!currentPassword || !newPassword)
+    return res
+      .status(400)
+      .json({ error: "currentPassword e newPassword são obrigatórios" });
+
+  if (typeof newPassword !== "string" || newPassword.length < 8)
+    return res
+      .status(400)
+      .json({ error: "newPassword deve ter no mínimo 8 caracteres" });
+
+  const user = await prisma.user.findFirst({
+    where: { id: requester.id, deletedAt: null },
+    select: { id: true, passwordHash: true },
+  });
+
+  if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash ?? "");
+  if (!ok) return res.status(401).json({ error: "Senha atual incorreta" });
+
+  const hash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: hash },
+  });
+
+  return res.json({ message: "Senha alterada com sucesso" });
+}

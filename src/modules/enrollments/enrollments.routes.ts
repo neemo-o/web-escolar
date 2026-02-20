@@ -12,12 +12,12 @@ const router = Router();
 router.post("/enrollments", authorize(["SECRETARY"]), createEnrollment);
 router.get(
   "/enrollments",
-  authorize(["SECRETARY", "STUDENT", "GUARDIAN"]),
+  authorize(["SECRETARY", "STUDENT", "GUARDIAN", "TEACHER"]),
   listEnrollments,
 );
 router.get(
   "/enrollments/:id",
-  authorize(["SECRETARY", "STUDENT", "GUARDIAN"]),
+  authorize(["SECRETARY", "STUDENT", "GUARDIAN", "TEACHER"]),
   getEnrollment,
 );
 router.patch(

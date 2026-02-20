@@ -46,14 +46,17 @@ export async function listGrades(req: Request, res: Response) {
   const requester = req.user!;
   if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
-      where: { userId: requester.id, schoolId: requester.schoolId },
+      where: {
+        userId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
     });
     if (!student)
       return res.status(403).json({ error: "Perfil de aluno não encontrado" });
     const enrollments = await prisma.enrollment.findMany({
       where: {
         studentId: student.id,
-        schoolId: requester.schoolId,
+        schoolId: requester.schoolId ?? undefined,
         status: "ATIVA",
       },
       select: { id: true },
@@ -64,7 +67,10 @@ export async function listGrades(req: Request, res: Response) {
     filters.enrollmentId = enrollmentIds;
   } else if (requester.role === "GUARDIAN") {
     const links = await prisma.studentGuardian.findMany({
-      where: { guardianId: requester.id, schoolId: requester.schoolId },
+      where: {
+        guardianId: requester.id,
+        schoolId: requester.schoolId ?? undefined,
+      },
       select: { studentId: true },
     });
     if (!links || links.length === 0)
@@ -75,7 +81,7 @@ export async function listGrades(req: Request, res: Response) {
     const enrollments = await prisma.enrollment.findMany({
       where: {
         studentId: { in: studentIds },
-        schoolId: requester.schoolId,
+        schoolId: requester.schoolId ?? undefined,
         status: "ATIVA",
       },
       select: { id: true },

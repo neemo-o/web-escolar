@@ -5,7 +5,21 @@ export const createStudentWithUser = async (data: {
   student: any;
 }) =>
   prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({ data: data.user });
+    const user = await tx.user.create({
+      data: data.user,
+      select: {
+        id: true,
+        schoolId: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
     const student = await tx.student.create({
       data: { ...data.student, userId: user.id },
     });

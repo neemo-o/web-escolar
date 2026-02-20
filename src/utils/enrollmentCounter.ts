@@ -5,11 +5,18 @@ function padNumber(n: number, width = 4) {
 }
 
 export async function nextEnrollmentNumber(schoolId: string, year: number) {
-  const updated = await prisma.enrollmentCounter.upsert({
-    where: { schoolId_year: { schoolId, year } },
-    create: { schoolId, year, lastNumber: 1 },
-    update: { lastNumber: { increment: 1 } },
+  // Fallback implementation when a dedicated counter table is not available in Prisma client.
+  // Find the last enrollment for the given year by matching enrollmentNumber prefix.
+  const prefix = `${year}-`;
+  const last = await prisma.enrollment.findFirst({
+    where: { schoolId, enrollmentNumber: { startsWith: prefix } },
+    orderBy: { createdAt: "desc" },
+    select: { enrollmentNumber: true },
   });
 
-  return `${year}-${padNumber(updated.lastNumber)}`;
+  const lastNumber = last
+    ? parseInt(String(last.enrollmentNumber).split("-")[1] || "0", 10)
+    : 0;
+  const next = lastNumber + 1;
+  return `${year}-${padNumber(next)}`;
 }

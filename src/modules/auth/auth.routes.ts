@@ -1,6 +1,11 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { login, resetPassword } from "./auth.controller";
+import {
+  login,
+  resetPassword,
+  me as getMe,
+  changePassword,
+} from "./auth.controller";
 import { authenticate } from "../../middlewares/authenticate";
 import { authorize } from "../../middlewares/authorize";
 
@@ -27,6 +32,10 @@ const resetPasswordLimiter = rateLimit({
 });
 
 router.post("/auth/login", loginLimiter, login);
+
+router.get("/auth/me", authenticate, getMe);
+
+router.patch("/auth/change-password", authenticate, changePassword);
 
 router.patch(
   "/users/:id/reset-password",
