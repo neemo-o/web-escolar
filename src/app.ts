@@ -29,5 +29,7 @@ import gradeLevelsRoutes from "./modules/grade-levels/grade-levels.routes";
 app.use(gradeLevelsRoutes);
 import subjectsRoutes from "./modules/subjects/subjects.routes";
 app.use(subjectsRoutes);
+import classroomsRoutes from "./modules/classrooms/classrooms.routes";
+app.use(classroomsRoutes);
 
 export { app };
