@@ -35,5 +35,7 @@ import classroomTeachersRoutes from "./modules/classroom-teachers/classroom-teac
 app.use(classroomTeachersRoutes);
 import classroomSubjectsRoutes from "./modules/classroom-subjects/classroom-subjects.routes";
 app.use(classroomSubjectsRoutes);
+import studentsRoutes from "./modules/students/students.routes";
+app.use(studentsRoutes);
 
 export { app };
