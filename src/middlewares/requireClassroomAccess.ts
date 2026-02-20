@@ -20,11 +20,13 @@ export async function requireClassroomAccess(
         where: { id: sessionId },
       });
       if (session) classroomId = session.classroomId;
+      else return res.status(404).json({ error: "Sessão não encontrada" });
     } else if (assessmentId) {
       const assessment = await prisma.assessment.findFirst({
         where: { id: assessmentId },
       });
       if (assessment) classroomId = assessment.classroomId;
+      else return res.status(404).json({ error: "Avaliação não encontrada" });
     }
   }
   if (!classroomId) return next();

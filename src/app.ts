@@ -32,7 +32,6 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || false, credentials: true }));
 // Public routes that must run before tenant middlewares
 app.use(schoolsRoutes);
 app.use(authRoutes);
-app.use(usersRoutes);
 
 // Global authentication/tenant middlewares
 app.use(authenticate);
@@ -52,6 +51,8 @@ app.use(enrollmentsRoutes);
 app.use(assessmentsRoutes);
 app.use(gradesRoutes);
 app.use(attendanceRoutes);
+
+app.use(usersRoutes);
 
 // Global error handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

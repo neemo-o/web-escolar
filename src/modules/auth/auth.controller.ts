@@ -33,6 +33,12 @@ export async function login(req: Request, res: Response) {
     },
   });
 
+  if (!schoolId && user && user.role !== "ADMIN_GLOBAL") {
+    return res
+      .status(400)
+      .json({ error: "schoolId é obrigatório para este tipo de usuário" });
+  }
+
   const DUMMY_HASH =
     "$2b$12$invalidhashfortimingprotectionxxxxxxxxxxxxxxxxxxxxxx";
   const hashToCompare = user?.passwordHash ?? DUMMY_HASH;

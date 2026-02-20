@@ -21,6 +21,11 @@ export async function createUser(req: Request, res: Response) {
   if (isAdmin) {
     // allow admin to set schoolId (or null for global)
     schoolId = req.body.schoolId ?? null;
+    if (role === "ADMIN_GLOBAL") {
+      return res
+        .status(403)
+        .json({ error: "Criação de ADMIN_GLOBAL via API não permitida" });
+    }
     if ((role === "STUDENT" || role === "GUARDIAN") && !req.body.schoolId) {
       return res
         .status(400)
@@ -119,6 +124,15 @@ export async function updateUser(req: Request, res: Response) {
   if (
     requester.role !== "ADMIN_GLOBAL" &&
     existing.schoolId !== requester.schoolId
+  ) {
+    return res
+      .status(403)
+      .json({ error: "Sem permissão para editar este usuário" });
+  }
+
+  if (
+    requester.role === "SECRETARY" &&
+    (existing.role === "SECRETARY" || existing.role === "ADMIN_GLOBAL")
   ) {
     return res
       .status(403)

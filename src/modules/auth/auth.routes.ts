@@ -37,12 +37,4 @@ router.get("/auth/me", authenticate, getMe);
 
 router.patch("/auth/change-password", authenticate, changePassword);
 
-router.patch(
-  "/users/:id/reset-password",
-  authenticate,
-  authorize(["SECRETARY"]),
-  resetPasswordLimiter,
-  resetPassword,
-);
-
 export default router;

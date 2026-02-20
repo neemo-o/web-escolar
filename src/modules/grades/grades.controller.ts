@@ -7,7 +7,9 @@ import { prisma } from "../../config/prisma";
 export async function createOrUpdateGrade(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
   const changedById = (req.user as any)?.id;
-  const { assessmentId, enrollmentId, score } = req.body;
+  const assessmentIdFromParams = (req.params as any).assessmentId;
+  const { enrollmentId, score } = req.body;
+  const assessmentId = assessmentIdFromParams ?? req.body.assessmentId;
   if (!assessmentId || !enrollmentId)
     return res
       .status(400)
@@ -104,5 +106,25 @@ export async function getGrade(req: Request, res: Response) {
   const id = getParam(req, "id");
   const item = await service.findGradeById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Grade not found" });
+  const requester = req.user!;
+  if (requester.role === "TEACHER") {
+    const assessment = await prisma.assessment.findFirst({
+      where: { id: (item as any).assessmentId, schoolId },
+    });
+    if (!assessment)
+      return res.status(404).json({ error: "Assessment not found" });
+    const link = await prisma.classroomTeacher.findFirst({
+      where: {
+        teacherId: requester.id,
+        classroomId: assessment.classroomId,
+        dateTo: null,
+        ...(requester.schoolId ? { schoolId: requester.schoolId } : {}),
+      },
+    });
+    if (!link)
+      return res
+        .status(403)
+        .json({ error: "Acesso negado: professor não vinculado a esta turma" });
+  }
   return res.json(item);
 }
