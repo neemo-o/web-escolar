@@ -25,5 +25,7 @@ import academicYearsRoutes from "./modules/academic-years/academic-years.routes"
 app.use(academicYearsRoutes);
 import periodsRoutes from "./modules/periods/periods.routes";
 app.use(periodsRoutes);
+import gradeLevelsRoutes from "./modules/grade-levels/grade-levels.routes";
+app.use(gradeLevelsRoutes);
 
 export { app };
