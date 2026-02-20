@@ -1,6 +1,7 @@
 import express from "express";
 import schoolsRoutes from "./modules/schools/schools.routes";
 import authRoutes from "./modules/auth/auth.routes";
+import usersRoutes from "./modules/users/users.routes";
 import { authenticate } from "./middlewares/authenticate";
 import { requireActiveSchool } from "./middlewares/requireActiveSchool";
 import { requireTenantMatch } from "./middlewares/tenant";
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use(schoolsRoutes);
 
 app.use(authRoutes);
+app.use(usersRoutes);
 
 app.use(authenticate);
 app.use(requireActiveSchool);
