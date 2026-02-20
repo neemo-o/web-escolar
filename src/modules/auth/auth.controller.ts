@@ -9,7 +9,7 @@ export async function login(req: Request, res: Response) {
   const { schoolId, email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: "email e password são obrigatórios" });
+    return res.status(400).json({ error: "Email e senha são obrigatórios" });
   }
 
   const isAdminGlobal = !schoolId;
