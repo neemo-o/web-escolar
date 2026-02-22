@@ -12,6 +12,10 @@ import {
 
 const router = Router();
 
+// Public schools listing for login dropdown
+import { listPublicSchools } from "./schools.controller";
+router.get("/public/schools", listPublicSchools);
+
 router.post(
   "/schools",
   authenticate,
@@ -19,12 +23,7 @@ router.post(
   createSchool,
 );
 
-router.get(
-  "/schools",
-  authenticate,
-  authorize(["ADMIN_GLOBAL"]),
-  listSchools,
-);
+router.get("/schools", authenticate, authorize(["ADMIN_GLOBAL"]), listSchools);
 
 router.get(
   "/schools/:id",

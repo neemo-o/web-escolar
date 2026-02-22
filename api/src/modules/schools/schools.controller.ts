@@ -53,6 +53,17 @@ export async function listSchools(req: Request, res: Response) {
   return res.json({ data: items, meta: { total, page, limit } });
 }
 
+export async function listPublicSchools(req: Request, res: Response) {
+  const items = await prisma.school.findMany({
+    where: { deletedAt: null, active: true },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true },
+  });
+
+  // Return a simple array for public consumption
+  return res.json(items);
+}
+
 export async function getSchool(req: Request, res: Response) {
   const id = getParam(req, "id");
 
