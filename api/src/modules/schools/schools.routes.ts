@@ -8,6 +8,7 @@ import {
   updateSchool,
   activateSchool,
   deactivateSchool,
+  getMySchool,
 } from "./schools.controller";
 
 const router = Router();
@@ -15,6 +16,9 @@ const router = Router();
 // Public schools listing for login dropdown
 import { listPublicSchools } from "./schools.controller";
 router.get("/public/schools", listPublicSchools);
+
+// Get the authenticated user's school
+router.get("/schools/me", authenticate, getMySchool);
 
 router.post(
   "/schools",

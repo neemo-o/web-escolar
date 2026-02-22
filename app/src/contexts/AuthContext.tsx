@@ -5,6 +5,7 @@ import api from "../utils/api";
 type AuthContextType = {
   token: string | null;
   user: any | null;
+  school: any | null;
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
@@ -24,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   });
   const [user, setUser] = useState<any | null>(null);
+  const [school, setSchool] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -40,12 +42,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     async function loadMe() {
       if (!token) {
         setUser(null);
+        setSchool(null);
         return;
       }
       setIsLoading(true);
       try {
         const data = await api.fetchJson("/auth/me");
         if (mounted) setUser(data);
+        // try to fetch school info for authenticated user
+        try {
+          const schoolData = await api.fetchJson("/schools/me");
+          if (mounted) setSchool(schoolData);
+        } catch (err) {
+          if (mounted) setSchool(null);
+        }
       } catch (err) {
         console.warn("Failed to fetch /auth/me", err);
         // token likely invalid — clear it
@@ -77,6 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         token,
         user,
+        school,
         login,
         logout,
         isAuthenticated: !!token,

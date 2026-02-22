@@ -64,6 +64,23 @@ export async function listPublicSchools(req: Request, res: Response) {
   return res.json(items);
 }
 
+export async function getMySchool(req: Request, res: Response) {
+  const requester = req.user;
+  if (!requester) return res.status(401).json({ error: "Não autenticado" });
+  const schoolId = requester.schoolId;
+  if (!schoolId)
+    return res.status(403).json({ error: "Usuário não pertence a uma escola" });
+
+  const school = await prisma.school.findFirst({
+    where: { id: schoolId, deletedAt: null },
+    include: { config: true },
+  });
+
+  if (!school) return res.status(404).json({ error: "Escola não encontrada" });
+
+  return res.json(school);
+}
+
 export async function getSchool(req: Request, res: Response) {
   const id = getParam(req, "id");
 
