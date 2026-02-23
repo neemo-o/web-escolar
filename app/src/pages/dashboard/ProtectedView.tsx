@@ -32,15 +32,14 @@ export function ProtectedView({
   if (!user) return <Navigate to="/login" replace />;
   if (!role) return <Navigate to="/dashboard/overview" replace />;
   if (allowedRoles.includes(role)) return <>{children}</>;
-  // access denied: notify and redirect to overview
-  try {
-    window.dispatchEvent(
-      new CustomEvent("toast", {
-        detail: { type: "error", message: "Acesso negado" },
-      }),
-    );
-  } catch {}
-  return <Navigate to="/dashboard/overview" replace />;
+  // access denied: redirect to overview with toast in location state
+  return (
+    <Navigate
+      to={{ pathname: "/dashboard/overview" }}
+      state={{ toast: { type: "error", message: "Acesso negado" } }}
+      replace
+    />
+  );
 }
 
 export default ProtectedView;

@@ -31,6 +31,7 @@ import StudentHealth from "./pages/dashboard/views/guardian/StudentHealth";
 import Profile from "./pages/dashboard/views/common/Profile";
 import Settings from "./pages/dashboard/views/common/Settings";
 import { useAuth } from "./contexts/AuthContext";
+import PagePlaceholder from "./pages/dashboard/PagePlaceholder";
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,7 +41,19 @@ function App() {
       <Route
         path="/login"
         element={
-          !isAuthenticated ? (
+          isLoading ? (
+            <div
+              style={{
+                width: "100vw",
+                height: "100dvh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              Carregando...
+            </div>
+          ) : !isAuthenticated ? (
             <LoginPage />
           ) : (
             <Navigate to="/dashboard" replace />
@@ -50,7 +63,19 @@ function App() {
       <Route
         path="/esqueci-senha"
         element={
-          isAuthenticated ? (
+          isLoading ? (
+            <div
+              style={{
+                width: "100vw",
+                height: "100dvh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              Carregando...
+            </div>
+          ) : isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <ForgotPasswordPage />
@@ -286,6 +311,19 @@ function App() {
             <ProtectedView allowedRoles={ROUTE_ROLES["settings"]}>
               <Settings />
             </ProtectedView>
+          }
+        />
+        {/* fallback for unknown dashboard routes */}
+        <Route
+          path="*"
+          element={
+            <div style={{ padding: 32 }}>
+              <h2 style={{ marginTop: 0 }}>Página não encontrada</h2>
+              <p style={{ color: "#6b7280" }}>
+                A rota requisitada não foi encontrada dentro do painel.
+              </p>
+              <PagePlaceholder pageId="overview" user={null} />
+            </div>
           }
         />
       </Route>

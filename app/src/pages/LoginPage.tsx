@@ -54,6 +54,7 @@ export default function LoginPage() {
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
   const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [schoolsError, setSchoolsError] = useState("");
   const [adminGlobal, setAdminGlobal] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -87,15 +88,24 @@ export default function LoginPage() {
         const data = await api.fetchJson("/public/schools");
         if (mounted && Array.isArray(data) && data.length > 0) {
           // Map to School interface conservatively
-          const mapped = data.map((s: any) => ({
-            id: String(s.id ?? s.uuid ?? s.code ?? s.name),
-            name: s.name ?? s.title ?? String(s.id),
-            color: s.color ?? "#6b7280",
-          }));
+          const mapped = data
+            .map((s: any) => {
+              const idCandidate = s.id ?? s.uuid ?? s.code ?? null;
+              if (!idCandidate) return null; // skip entries without a stable id
+              return {
+                id: String(idCandidate),
+                name: s.name ?? s.title ?? String(idCandidate),
+                color: s.color ?? "#6b7280",
+              };
+            })
+            .filter(Boolean) as School[];
           setSchools(mapped);
         }
       } catch (err) {
         console.warn("Could not fetch schools, using fallback", err);
+        setSchoolsError(
+          err instanceof Error ? err.message : "Falha ao carregar escolas",
+        );
         // keep empty list
       } finally {
         if (mounted) setSchoolsLoading(false);
@@ -147,6 +157,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      // basic email format validation
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        setError("E-mail inválido");
+        setLoading(false);
+        return;
+      }
       const body: any = { email, password };
       if (!adminGlobal && selectedSchool) body.schoolId = selectedSchool.id;
       const data = await api.fetchJson("/auth/login", {
@@ -159,6 +175,8 @@ export default function LoginPage() {
       login(data.token);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro ao fazer login");
+      // clear password for security after failed login
+      setPassword("");
     } finally {
       setLoading(false);
     }
@@ -726,38 +744,6 @@ export default function LoginPage() {
                     document.body,
                   )}
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginTop: 8,
-                }}
-              >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: "pointer",
-                    fontSize: 13,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={adminGlobal}
-                    onChange={(e) => setAdminGlobal(e.target.checked)}
-                  />
-                  <span style={{ color: "#374151", fontWeight: 600 }}>
-                    Entrar como administrador global
-                  </span>
-                </label>
-                {schoolsLoading && (
-                  <span style={{ color: "#9ca3af", fontSize: 12 }}>
-                    Carregando escolas...
-                  </span>
-                )}
-              </div>
 
               {/* ── EMAIL ── */}
               <div
@@ -943,6 +929,47 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 8,
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={adminGlobal}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setAdminGlobal(v);
+                      if (v) setSelectedSchool(null);
+                    }}
+                  />
+                  <span style={{ color: "#374151", fontWeight: 600 }}>
+                    Entrar como administrador global
+                  </span>
+                </label>
+                {schoolsLoading && (
+                  <span style={{ color: "#9ca3af", fontSize: 12 }}>
+                    Carregando escolas...
+                  </span>
+                )}
+                {!schoolsLoading && schoolsError && (
+                  <span style={{ color: "#dc2626", fontSize: 12 }}>
+                    {schoolsError}
+                  </span>
+                )}
+              </div>
               {/* ── SUBMIT ── */}
               <div
                 style={{

@@ -31,9 +31,6 @@ export async function fetchJson(input: string, init?: RequestInit) {
 
   if (!res.ok) {
     if (res.status === 401) {
-      try {
-        localStorage.removeItem("token");
-      } catch {}
       // notify listeners (AuthContext) that logout should happen
       try {
         window.dispatchEvent(new Event("auth:logout"));

@@ -38,6 +38,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const navigate = useNavigate();
   const expirationTimer = useRef<number | null>(null);
 
+  function base64UrlDecode(input: string) {
+    let s = input.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    return atob(s);
+  }
+
+  function parseJwtExp(t: string | null): number | null {
+    try {
+      if (!t) return null;
+      const parts = t.split(".");
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(base64UrlDecode(parts[1]));
+      const exp = payload?.exp;
+      return typeof exp === "number" ? exp : null;
+    } catch {
+      return null;
+    }
+  }
+
   useEffect(() => {
     try {
       if (token) localStorage.setItem("token", token);
@@ -52,6 +71,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch {}
   }, [token]);
 
+  function clearExpirationTimer() {
+    if (expirationTimer.current) {
+      window.clearTimeout(expirationTimer.current);
+      expirationTimer.current = null;
+    }
+  }
+
+  function scheduleExpiration(t: string | null) {
+    clearExpirationTimer();
+    const exp = parseJwtExp(t);
+    if (exp) {
+      const ms = exp * 1000 - Date.now() - 60 * 1000; // 60s before
+      if (ms > 0) {
+        expirationTimer.current = window.setTimeout(() => {
+          // ensure we perform a full logout flow
+          logout();
+        }, ms);
+      }
+    }
+  }
+
   // When token is present, try to fetch /auth/me to populate user
   useEffect(() => {
     let mounted = true;
@@ -61,6 +101,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setSchool(null);
         return;
       }
+      // clear previous user/school to avoid leaking stale data while fetching
+      setUser(null);
+      setSchool(null);
       setIsLoading(true);
       try {
         // parallelize user + school fetch
@@ -74,28 +117,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           if (schoolData.status === "fulfilled") setSchool(schoolData.value);
           else setSchool(null);
         }
-        // schedule logout based on JWT exp if present
-        try {
-          const t = token;
-          if (t) {
-            const parts = t.split(".");
-            if (parts.length >= 2) {
-              const payload = JSON.parse(atob(parts[1]));
-              const exp = payload?.exp;
-              if (exp) {
-                const ms = exp * 1000 - Date.now() - 60 * 1000; // logout 60s before
-                if (expirationTimer.current)
-                  window.clearTimeout(expirationTimer.current);
-                if (ms > 0)
-                  expirationTimer.current = window.setTimeout(() => {
-                    setToken(null);
-                  }, ms);
-              }
-            }
-          }
-        } catch (err) {
-          /* ignore */
+
+        if (mounted && data.status !== "fulfilled") {
+          // trigger full logout flow
+          setToken(null);
+          api.setAuthToken(null);
+          clearExpirationTimer();
+          navigate("/login");
+          setIsLoading(false);
+          return;
         }
+        scheduleExpiration(token);
       } catch (err) {
         console.warn("Failed to fetch /auth/me", err);
         // token likely invalid — clear it
@@ -112,23 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = (t: string) => {
     setToken(t);
-    // schedule logout based on JWT exp
-    try {
-      const parts = t.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(atob(parts[1]));
-        const exp = payload?.exp;
-        if (exp) {
-          const ms = exp * 1000 - Date.now() - 60 * 1000;
-          if (expirationTimer.current)
-            window.clearTimeout(expirationTimer.current);
-          if (ms > 0)
-            expirationTimer.current = window.setTimeout(() => {
-              setToken(null);
-            }, ms);
-        }
-      }
-    } catch {}
+    scheduleExpiration(t);
     // navigation happens after token is set and /auth/me will be triggered
     navigate("/dashboard");
   };
@@ -145,12 +161,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // listen to global auth:logout events (dispatched by fetchJson on 401)
   useEffect(() => {
     function onExternalLogout() {
-      setToken(null);
-      setUser(null);
-      setSchool(null);
-      api.setAuthToken(null);
-      if (expirationTimer.current) window.clearTimeout(expirationTimer.current);
-      navigate("/login");
+      // reuse the unified logout flow
+      logout();
     }
     try {
       window.addEventListener("auth:logout", onExternalLogout as EventListener);
@@ -173,7 +185,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         school,
         login,
         logout,
-        isAuthenticated: !!token && !!user,
+        // only consider authenticated when not loading and user+token present
+        isAuthenticated: !isLoading && !!token && !!user,
         isLoading,
       }}
     >

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
 import { useWindowSize } from "./dashboard/useWindowSize";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
   const { w, h } = useWindowSize();
@@ -18,10 +21,29 @@ export default function ForgotPasswordPage() {
     return () => clearTimeout(t);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    setSubmitted(true);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setError("E-mail inválido");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      // try to call backend endpoint; if it doesn't exist, fallback to same UI
+      await api.fetchJson("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao enviar solicitação",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputH = isShortMobile ? 38 : isMobile ? 41 : 44;
