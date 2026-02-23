@@ -1,7 +1,13 @@
 import { prisma } from "../../config/prisma";
 
+const include = {
+  academicYear: { select: { id: true, year: true, status: true } },
+  gradeLevel: { select: { id: true, name: true, code: true } },
+  _count: { select: { enrollments: true } },
+};
+
 export const createClassroomRecord = (data: any) =>
-  prisma.classroom.create({ data });
+  prisma.classroom.create({ data, include });
 
 export const findClassrooms = (
   schoolId: string,
@@ -20,6 +26,7 @@ export const findClassrooms = (
     skip,
     take,
     orderBy: { name: "asc" },
+    include,
   });
 };
 
@@ -34,10 +41,13 @@ export const countClassrooms = (schoolId: string, filters: any) => {
 };
 
 export const findClassroomById = (id: string, schoolId: string) =>
-  prisma.classroom.findFirst({ where: { id, schoolId, deletedAt: null } });
+  prisma.classroom.findFirst({
+    where: { id, schoolId, deletedAt: null },
+    include,
+  });
 
 export const updateClassroomById = (id: string, data: any) =>
-  prisma.classroom.update({ where: { id }, data });
+  prisma.classroom.update({ where: { id }, data, include });
 
 export const softDeleteClassroomById = (id: string) =>
   prisma.classroom.update({ where: { id }, data: { deletedAt: new Date() } });

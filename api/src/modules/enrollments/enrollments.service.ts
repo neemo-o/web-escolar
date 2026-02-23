@@ -1,7 +1,13 @@
 import { prisma } from "../../config/prisma";
 
+const include = {
+  student: { select: { id: true, name: true, cpf: true } },
+  classroom: { select: { id: true, name: true } },
+  academicYear: { select: { id: true, year: true } },
+};
+
 export const createEnrollmentRecord = (data: any) =>
-  prisma.enrollment.create({ data });
+  prisma.enrollment.create({ data, include });
 
 export const findEnrollments = (
   schoolId: string,
@@ -14,6 +20,7 @@ export const findEnrollments = (
     skip,
     take,
     orderBy: { createdAt: "desc" },
+    include,
   });
 
 export const countEnrollments = (schoolId: string, filters: any) =>
@@ -22,7 +29,10 @@ export const countEnrollments = (schoolId: string, filters: any) =>
   });
 
 export const findEnrollmentById = (id: string, schoolId: string) =>
-  prisma.enrollment.findFirst({ where: { id, schoolId, deletedAt: null } });
+  prisma.enrollment.findFirst({
+    where: { id, schoolId, deletedAt: null },
+    include,
+  });
 
 export const updateEnrollmentStatusById = (id: string, status: any) =>
-  prisma.enrollment.update({ where: { id }, data: { status } });
+  prisma.enrollment.update({ where: { id }, data: { status }, include });
