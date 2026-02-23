@@ -60,7 +60,12 @@ export default function Sidebar({
         />
         {/* SchoolLogo kept in Dashboard to allow injection of school props */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <SchoolLogo name={school?.name || "Colégio"} />
+          <SchoolLogo
+            name={
+              school?.name ??
+              (role === "ADMIN_GLOBAL" ? "Sistema Global" : "Colégio")
+            }
+          />
         </div>
       </div>
 

@@ -1,28 +1,52 @@
+let moduleToken: string | null = null;
+
+export function setAuthToken(t: string | null) {
+  moduleToken = t;
+}
+
 export async function fetchJson(input: string, init?: RequestInit) {
-  const base = (import.meta.env.VITE_API_BASE as string) || '/api'
-  const url = input.startsWith('http') ? input : `${base}${input.startsWith('/') ? '' : '/'}${input}`
+  const base = (import.meta.env.VITE_API_BASE as string) || "/api";
+  const url = input.startsWith("http")
+    ? input
+    : `${base}${input.startsWith("/") ? "" : "/"}${input}`;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  // prefer module-level token (set by AuthContext), fallback to localStorage
+  const token =
+    moduleToken ??
+    (typeof window !== "undefined" ? localStorage.getItem("token") : null);
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(init && (init.headers as Record<string, string>)),
-  }
-  if (token) headers.Authorization = `Bearer ${token}`
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(url, { ...(init || {}), headers })
-  const text = await res.text()
-  let data: any = null
-  try { data = text ? JSON.parse(text) : null } catch { data = text }
+  const res = await fetch(url, { ...(init || {}), headers });
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
 
   if (!res.ok) {
     if (res.status === 401) {
-      try { localStorage.removeItem('token') } catch {}
+      try {
+        localStorage.removeItem("token");
+      } catch {}
+      // notify listeners (AuthContext) that logout should happen
+      try {
+        window.dispatchEvent(new Event("auth:logout"));
+      } catch {}
     }
-    const message = data && (data.error || data.message) ? (data.error || data.message) : res.statusText
-    throw new Error(message || 'Erro na requisição')
+    const message =
+      data && (data.error || data.message)
+        ? data.error || data.message
+        : res.statusText;
+    throw new Error(message || "Erro na requisição");
   }
 
-  return data
+  return data;
 }
 
-export default { fetchJson }
+export default { fetchJson, setAuthToken };

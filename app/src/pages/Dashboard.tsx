@@ -6,28 +6,22 @@ import Avatar from "./dashboard/Avatar";
 import SchoolLogo from "./dashboard/SchoolLogo";
 import Sidebar from "./dashboard/Sidebar";
 // PagePlaceholder moved to child routes; Dashboard renders an <Outlet />
-import { getNavGroups, PAGE_TITLES } from "./dashboard/nav";
-import {
-  ROLE_COLORS,
-  ROLE_LABELS,
-  MOCK_USER,
-  MOCK_SCHOOL,
-} from "./dashboard/constants";
+import { PAGE_TITLES } from "./dashboard/nav";
+import { ROLE_COLORS, ROLE_LABELS } from "./dashboard/constants";
 import { iconMenu, iconClose, iconLogout, iconPerson } from "./dashboard/icons";
 
 export default function Dashboard() {
-  const { user: authUser, school: authSchool, logout } = useAuth();
+  const { user: authUser, school: authSchool, logout, isLoading } = useAuth();
   const [activePage, setActivePage] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { w } = useWindowSize();
 
   const isMobile = w < 768;
-  const user = authUser || MOCK_USER;
-  const school = authSchool || MOCK_SCHOOL;
+  const user = authUser;
+  const school = authSchool;
   const role = user?.role || "STUDENT";
   const accentColor = ROLE_COLORS[role] || "#6366f1";
-  const navGroups = getNavGroups(role);
   const SIDEBAR_W = 240;
 
   useEffect(() => {
@@ -63,8 +57,6 @@ export default function Dashboard() {
       // pass school so Sidebar can render SchoolLogo
       // (Dashboard keeps SchoolLogo to inject school props)
       // sidebarWidth is passed below
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       school={school}
       sidebarWidth={SIDEBAR_W}
     />
@@ -234,7 +226,11 @@ export default function Dashboard() {
             flexDirection: "column",
           }}
         >
-          <Outlet />
+          {isLoading ? (
+            <div style={{ padding: 28 }}>Carregando...</div>
+          ) : (
+            <Outlet />
+          )}
         </div>
       </div>
 

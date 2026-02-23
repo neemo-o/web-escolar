@@ -10,12 +10,6 @@ interface School {
   color: string;
 }
 
-const MOCK_SCHOOLS: School[] = [
-  { id: "1", name: "Colégio Alpha", color: "#6366f1" },
-  { id: "2", name: "Escola Beta", color: "#f59e0b" },
-  { id: "3", name: "Instituto Gama", color: "#10b981" },
-];
-
 function SchoolAvatar({
   school,
   size = 28,
@@ -45,19 +39,7 @@ function SchoolAvatar({
   );
 }
 
-function useWindowSize() {
-  const [size, setSize] = useState({
-    w: window.innerWidth,
-    h: window.innerHeight,
-  });
-  useEffect(() => {
-    const handler = () =>
-      setSize({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-  return size;
-}
+import { useWindowSize } from "./dashboard/useWindowSize";
 
 export default function LoginPage() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -70,8 +52,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
-  const [schools, setSchools] = useState<School[]>(MOCK_SCHOOLS);
+  const [schools, setSchools] = useState<School[]>([]);
   const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [adminGlobal, setAdminGlobal] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -86,14 +69,16 @@ export default function LoginPage() {
   const filtered = schools.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()),
   );
-  const isFormValid = !!selectedSchool && !!email && !!password;
+  const isFormValid = adminGlobal
+    ? !!email && !!password
+    : !!selectedSchool && !!email && !!password;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 40);
     return () => clearTimeout(t);
   }, []);
 
-  // Fetch real schools from API; fallback to MOCK_SCHOOLS on error
+  // Fetch real schools from API
   useEffect(() => {
     let mounted = true;
     async function loadSchools() {
@@ -111,6 +96,7 @@ export default function LoginPage() {
         }
       } catch (err) {
         console.warn("Could not fetch schools, using fallback", err);
+        // keep empty list
       } finally {
         if (mounted) setSchoolsLoading(false);
       }
@@ -161,9 +147,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      const body: any = { email, password };
+      if (!adminGlobal && selectedSchool) body.schoolId = selectedSchool.id;
       const data = await api.fetchJson("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ schoolId: selectedSchool!.id, email, password }),
+        body: JSON.stringify(body),
       });
       if (!data || !data.token)
         throw new Error("Resposta inválida do servidor");
@@ -527,6 +515,7 @@ export default function LoginPage() {
                   ref={triggerRef}
                   type="button"
                   onClick={openDropdown}
+                  disabled={adminGlobal}
                   style={{
                     width: "100%",
                     display: "flex",
@@ -537,7 +526,7 @@ export default function LoginPage() {
                     border: `1.5px solid ${dropdownOpen ? "#5b5ef4" : "#e2e5ea"}`,
                     borderRadius: 10,
                     background: "#fff",
-                    cursor: "pointer",
+                    cursor: adminGlobal ? "not-allowed" : "pointer",
                     fontSize: 13.5,
                     boxShadow: dropdownOpen
                       ? "0 0 0 3px rgba(91,94,244,0.11)"
@@ -736,6 +725,38 @@ export default function LoginPage() {
                     </div>,
                     document.body,
                   )}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 8,
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={adminGlobal}
+                    onChange={(e) => setAdminGlobal(e.target.checked)}
+                  />
+                  <span style={{ color: "#374151", fontWeight: 600 }}>
+                    Entrar como administrador global
+                  </span>
+                </label>
+                {schoolsLoading && (
+                  <span style={{ color: "#9ca3af", fontSize: 12 }}>
+                    Carregando escolas...
+                  </span>
+                )}
               </div>
 
               {/* ── EMAIL ── */}

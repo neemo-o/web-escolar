@@ -1,19 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-function useWindowSize() {
-  const [size, setSize] = useState({
-    w: window.innerWidth,
-    h: window.innerHeight,
-  });
-  useEffect(() => {
-    const handler = () =>
-      setSize({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-  return size;
-}
+import { useWindowSize } from "./dashboard/useWindowSize";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
