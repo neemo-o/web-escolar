@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import {
   login,
   resetPassword,
+  forgotPassword,
   me as getMe,
   changePassword,
 } from "./auth.controller";
@@ -32,6 +33,8 @@ const resetPasswordLimiter = rateLimit({
 });
 
 router.post("/auth/login", loginLimiter, login);
+
+router.post("/auth/forgot-password", resetPasswordLimiter, forgotPassword);
 
 router.get("/auth/me", authenticate, getMe);
 

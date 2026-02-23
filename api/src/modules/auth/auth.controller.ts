@@ -5,6 +5,7 @@ import { prisma } from "../../config/prisma";
 import getParam from "../../utils/getParam";
 import { env } from "../../config/env";
 import { generateTempPassword } from "../../utils/password";
+import { sendPasswordResetEmail } from "../../utils/email";
 
 export async function login(req: Request, res: Response) {
   const { schoolId, email, password } = req.body;
@@ -160,4 +161,39 @@ export async function changePassword(req: Request, res: Response) {
   });
 
   return res.json({ message: "Senha alterada com sucesso" });
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: "E-mail é obrigatório" });
+
+  const user = await prisma.user.findFirst({
+    where: { email, deletedAt: null },
+    select: { id: true, email: true, name: true },
+  });
+
+  // Always return success to avoid leaking which emails are registered
+  if (!user) {
+    return res.json({
+      message: "Se o e-mail existir, instruções foram enviadas.",
+    });
+  }
+
+  const tempPassword = generateTempPassword();
+  const hash = await bcrypt.hash(tempPassword, 12);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: hash },
+  });
+
+  try {
+    await sendPasswordResetEmail(user.email, user.name ?? null, tempPassword);
+  } catch (err) {
+    // ignore email errors; still return generic success
+  }
+
+  return res.json({
+    message: "Se o e-mail existir, instruções foram enviadas.",
+  });
 }
