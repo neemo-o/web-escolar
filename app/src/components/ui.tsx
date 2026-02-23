@@ -78,7 +78,6 @@ export function Card({
         background: "#fff",
         borderRadius: 14,
         border: "1px solid #e9ebf0",
-        overflow: "hidden",
         ...style,
       }}
     >
@@ -168,8 +167,17 @@ export function SearchBar({
   children?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <div style={{ position: "relative", flex: 1, maxWidth: 340 }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
+      <div
+        style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 340 }}
+      >
         <svg
           width="15"
           height="15"
@@ -182,6 +190,7 @@ export function SearchBar({
             left: 10,
             top: "50%",
             transform: "translateY(-50%)",
+            pointerEvents: "none",
           }}
         >
           <circle cx="11" cy="11" r="8" />
@@ -264,9 +273,15 @@ export function DataTable({
   emptyMessage?: string;
 }) {
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ width: "100%", overflowX: "auto" }}>
       <table
-        style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 13,
+          tableLayout: "auto",
+          minWidth: 540,
+        }}
       >
         <thead>
           <tr style={{ background: "#f8fafc" }}>
@@ -284,6 +299,7 @@ export function DataTable({
                   borderBottom: "1px solid #e9ebf0",
                   whiteSpace: "nowrap",
                   width: col.width,
+                  minWidth: col.width,
                 }}
               >
                 {col.label}
@@ -354,48 +370,78 @@ export function Pagination({
   onPage: (p: number) => void;
 }) {
   const pages = Math.ceil(total / limit);
-  if (pages <= 1) return null;
+  if (total === 0) return null;
+
   const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
+
+  // Build visible page numbers with ellipsis
+  function getPageNumbers(): (number | "...")[] {
+    if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+    const result: (number | "...")[] = [];
+    if (page <= 4) {
+      result.push(1, 2, 3, 4, 5, "...", pages);
+    } else if (page >= pages - 3) {
+      result.push(1, "...", pages - 4, pages - 3, pages - 2, pages - 1, pages);
+    } else {
+      result.push(1, "...", page - 1, page, page + 1, "...", pages);
+    }
+    return result;
+  }
+
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "12px 14px",
+        padding: "12px 16px",
         borderTop: "1px solid #f1f5f9",
         fontSize: 12.5,
         color: "#6b7280",
+        flexWrap: "wrap",
+        gap: 8,
       }}
     >
-      <span>
-        {from}–{to} de {total}
+      <span style={{ whiteSpace: "nowrap" }}>
+        Mostrando{" "}
+        <strong style={{ color: "#374151" }}>
+          {from}–{to}
+        </strong>{" "}
+        de <strong style={{ color: "#374151" }}>{total}</strong>
       </span>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
         <button
           onClick={() => onPage(page - 1)}
           disabled={page === 1}
           style={paginBtn(page === 1)}
+          title="Anterior"
         >
           ‹
         </button>
-        {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
-          const p = i + 1;
-          return (
+        {getPageNumbers().map((p, i) =>
+          p === "..." ? (
+            <span
+              key={`e${i}`}
+              style={{ padding: "0 2px", color: "#9ca3af", fontSize: 13 }}
+            >
+              …
+            </span>
+          ) : (
             <button
               key={p}
-              onClick={() => onPage(p)}
+              onClick={() => onPage(p as number)}
               style={paginBtn(false, p === page)}
             >
               {p}
             </button>
-          );
-        })}
+          ),
+        )}
         <button
           onClick={() => onPage(page + 1)}
           disabled={page === pages}
           style={paginBtn(page === pages)}
+          title="Próxima"
         >
           ›
         </button>
@@ -403,18 +449,21 @@ export function Pagination({
     </div>
   );
 }
+
 function paginBtn(disabled: boolean, active = false): React.CSSProperties {
   return {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
+    minWidth: 30,
+    height: 30,
+    padding: "0 6px",
+    borderRadius: 7,
     border: active ? `1.5px solid ${accent}` : "1.5px solid #e2e8f0",
-    background: active ? `${accent}12` : "#fff",
+    background: active ? `${accent}12` : disabled ? "#f9fafb" : "#fff",
     color: active ? accent : disabled ? "#d1d5db" : "#374151",
     fontSize: 13,
     cursor: disabled ? "not-allowed" : "pointer",
     fontFamily: "inherit",
     fontWeight: active ? 700 : 500,
+    transition: "all 0.15s",
   };
 }
 
@@ -503,9 +552,9 @@ export function Modal({
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    function onKey(e: KeyboardEvent) {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-    }
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -550,6 +599,7 @@ export function Modal({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexShrink: 0,
           }}
         >
           <span style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>

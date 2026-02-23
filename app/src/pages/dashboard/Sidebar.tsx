@@ -2,7 +2,7 @@ import React from "react";
 import { getNavGroups } from "./nav";
 import SchoolLogo from "./SchoolLogo";
 import { ROLE_LABELS } from "./constants";
-import { iconPerson, iconLogout } from "./icons";
+import { iconPerson, iconLogout, iconSettings } from "./icons";
 
 type Props = {
   user: any;
@@ -25,6 +25,53 @@ export default function Sidebar({
 }: Props) {
   const navGroups = getNavGroups(role);
 
+  function footerBtn(
+    id: string,
+    label: string,
+    icon: React.ReactNode,
+    isActive: boolean,
+    danger = false,
+    onClick?: () => void,
+  ) {
+    return (
+      <button
+        onClick={onClick ?? (() => onNavClick(id))}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          padding: "8px 10px",
+          borderRadius: 9,
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: 13,
+          fontWeight: isActive ? 700 : 500,
+          color: danger
+            ? "rgba(255,100,100,0.85)"
+            : isActive
+              ? "#fff"
+              : "rgba(255,255,255,0.62)",
+          background: isActive ? "rgba(255,255,255,0.15)" : "transparent",
+          textAlign: "left",
+          marginBottom: 2,
+          transition: "background 0.15s, color 0.15s",
+        }}
+      >
+        <span
+          style={{
+            opacity: danger ? 0.75 : isActive ? 1 : 0.75,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </span>
+        {label}
+      </button>
+    );
+  }
+
   return (
     <div
       style={{
@@ -38,6 +85,7 @@ export default function Sidebar({
         overflowX: "hidden",
       }}
     >
+      {/* ── Cabeçalho / Logo ─────────────────────── */}
       <div
         style={{
           position: "relative",
@@ -58,7 +106,6 @@ export default function Sidebar({
             pointerEvents: "none",
           }}
         />
-        {/* SchoolLogo kept in Dashboard to allow injection of school props */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <SchoolLogo
             name={
@@ -69,6 +116,7 @@ export default function Sidebar({
         </div>
       </div>
 
+      {/* ── Usuário ───────────────────────────────── */}
       <div
         style={{
           padding: "14px 16px",
@@ -78,7 +126,6 @@ export default function Sidebar({
           gap: 10,
         }}
       >
-        {/* Avatar is rendered by parent (Dashboard) to allow control */}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
@@ -108,6 +155,7 @@ export default function Sidebar({
         </div>
       </div>
 
+      {/* ── Navegação principal ───────────────────── */}
       <nav style={{ flex: 1, padding: "10px 10px", overflowY: "auto" }}>
         {navGroups.map((group) => (
           <div key={group.label} style={{ marginBottom: 6 }}>
@@ -181,61 +229,26 @@ export default function Sidebar({
         ))}
       </nav>
 
+      {/* ── Rodapé: Perfil + Configurações + Sair ── */}
       <div
         style={{
           padding: "10px 10px 14px",
           borderTop: "1px solid rgba(255,255,255,0.1)",
         }}
       >
-        <button
-          onClick={() => onNavClick("profile")}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            padding: "8px 10px",
-            borderRadius: 9,
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: activePage === "profile" ? 700 : 500,
-            color: activePage === "profile" ? "#fff" : "rgba(255,255,255,0.62)",
-            background:
-              activePage === "profile"
-                ? "rgba(255,255,255,0.15)"
-                : "transparent",
-            textAlign: "left",
-            marginBottom: 2,
-          }}
-        >
-          <span style={{ opacity: 0.75 }}>{iconPerson()}</span>
-          Meu Perfil
-        </button>
-        <button
-          onClick={logout}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            padding: "8px 10px",
-            borderRadius: 9,
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: 500,
-            color: "rgba(255,100,100,0.85)",
-            background: "transparent",
-            textAlign: "left",
-            transition: "background 0.15s",
-          }}
-        >
-          <span style={{ opacity: 0.75 }}>{iconLogout()}</span>
-          Sair
-        </button>
+        {footerBtn(
+          "profile",
+          "Meu Perfil",
+          iconPerson(),
+          activePage === "profile",
+        )}
+        {footerBtn(
+          "settings",
+          "Configurações",
+          iconSettings(),
+          activePage === "settings",
+        )}
+        {footerBtn("logout", "Sair", iconLogout(), false, true, logout)}
       </div>
     </div>
   );
