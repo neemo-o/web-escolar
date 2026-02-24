@@ -17,6 +17,11 @@ export const ROUTE_ROLES: Record<string, string[]> = {
   "reset-password": ["SECRETARY"],
   reports: ["ADMIN_GLOBAL", "SECRETARY"],
 
+  // FIX #11 #12 #13: new secretary configuration routes
+  "academic-years": ["SECRETARY"],
+  "grade-levels": ["SECRETARY"],
+  subjects: ["SECRETARY"],
+
   // teacher
   "my-classrooms": ["TEACHER"],
   "my-students": ["TEACHER"],
@@ -30,8 +35,8 @@ export const ROUTE_ROLES: Record<string, string[]> = {
   "my-assessments": ["STUDENT"],
   "my-progress": ["STUDENT"],
 
-  // guardian
-  "student-classrooms": ["GUARDIAN"],
+  // guardian + student share classrooms view
+  "student-classrooms": ["GUARDIAN", "STUDENT"],
   "student-grades": ["GUARDIAN"],
   "student-assessments": ["GUARDIAN"],
   "student-progress": ["GUARDIAN"],

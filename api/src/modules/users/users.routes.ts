@@ -8,33 +8,19 @@ import {
   getUser,
   updateUser,
   deactivateUser,
+  activateUser,
+  getUserStats,
 } from "./users.controller";
 
 const router = Router();
 
 router.post("/users", authorize(["ADMIN_GLOBAL", "SECRETARY"]), createUser);
-
+router.get("/users/stats", authorize(["ADMIN_GLOBAL", "SECRETARY"]), getUserStats);
 router.get("/users", authorize(["ADMIN_GLOBAL", "SECRETARY"]), listUsers);
-
 router.get("/users/:id", authorize(["ADMIN_GLOBAL", "SECRETARY"]), getUser);
-
-router.patch(
-  "/users/:id",
-  authorize(["ADMIN_GLOBAL", "SECRETARY"]),
-  updateUser,
-);
-
-router.patch(
-  "/users/:id/deactivate",
-  authorize(["ADMIN_GLOBAL", "SECRETARY"]),
-  deactivateUser,
-);
-
-router.patch(
-  "/users/:id/reset-password",
-  authenticate,
-  authorize(["SECRETARY"]),
-  resetPassword,
-);
+router.patch("/users/:id", authorize(["ADMIN_GLOBAL", "SECRETARY"]), updateUser);
+router.patch("/users/:id/deactivate", authorize(["ADMIN_GLOBAL", "SECRETARY"]), deactivateUser);
+router.patch("/users/:id/activate", authorize(["ADMIN_GLOBAL", "SECRETARY"]), activateUser);
+router.patch("/users/:id/reset-password", authenticate, authorize(["SECRETARY"]), resetPassword);
 
 export default router;

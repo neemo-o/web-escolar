@@ -1,634 +1,319 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
 import {
-  PageShell,
-  Card,
-  PrimaryButton,
-  SearchBar,
-  SelectFilter,
-  DataTable,
-  Pagination,
-  StatusBadge,
-  IconButton,
-  Modal,
-  FormField,
-  Select,
-  ModalFooter,
-  InlineAlert,
-  toast,
-  StatCard,
+  PageShell, Card, PrimaryButton, SearchBar, SelectFilter, DataTable, Pagination,
+  StatusBadge, IconButton, Modal, FormField, Select, ModalFooter, InlineAlert, toast,
 } from "../../../../components/ui";
 
-const SHIFT_LABELS: Record<string, string> = {
-  MANHA: "Manhã",
-  TARDE: "Tarde",
-  NOTURNO: "Noturno",
-  INTEGRAL: "Integral",
-};
-const SHIFT_OPTIONS = Object.entries(SHIFT_LABELS).map(([v, l]) => ({
-  value: v,
-  label: l,
-}));
+const SHIFT_LABELS: Record<string, string> = { MANHA: "Manhã", TARDE: "Tarde", NOTURNO: "Noturno", INTEGRAL: "Integral" };
+const SHIFT_OPTIONS = Object.entries(SHIFT_LABELS).map(([v, l]) => ({ value: v, label: l }));
 const SHIFT_COLORS: Record<string, "blue" | "yellow" | "purple" | "green"> = {
-  MANHA: "blue",
-  TARDE: "yellow",
-  NOTURNO: "purple",
-  INTEGRAL: "green",
+  MANHA: "blue", TARDE: "yellow", NOTURNO: "purple", INTEGRAL: "green",
 };
 
-type Classroom = {
-  id: string;
-  name: string;
-  shift: string;
-  capacity: number;
-  academicYear?: { year: number };
-  gradeLevel?: { name: string };
-  _count?: { enrollments: number };
-};
+type Classroom = { id: string; name: string; shift: string; capacity: number; academicYear?: { year: number }; gradeLevel?: { name: string }; _count?: { enrollments: number } };
 type AcademicYear = { id: string; year: number; status: string };
 type GradeLevel = { id: string; name: string };
+type Subject = { id: string; name: string; code: string };
+type TeacherLink = { id: string; teacher: { id: string; name: string; email: string }; subject: { id: string; name: string } };
 type Teacher = { id: string; name: string; email: string };
 
-type FormState = {
-  name: string;
-  shift: string;
-  capacity: string;
-  academicYearId: string;
-  gradeLevelId: string;
+type FormState = { name: string; shift: string; capacity: string; academicYearId: string; gradeLevelId: string };
+const emptyForm = (): FormState => ({ name: "", shift: "", capacity: "30", academicYearId: "", gradeLevelId: "" });
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", height: 40, padding: "0 12px", borderRadius: 9,
+  border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
 };
-const emptyForm = (): FormState => ({
-  name: "",
-  shift: "",
-  capacity: "30",
-  academicYearId: "",
-  gradeLevelId: "",
-});
 
 export default function Classrooms() {
   const [items, setItems] = useState<Classroom[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
   const [yearFilter, setYearFilter] = useState("");
-  const [modal, setModal] = useState<
-    "create" | "edit" | "delete" | "teachers" | null
-  >(null);
+  const [modal, setModal] = useState<"create" | "edit" | "delete" | "teachers" | null>(null);
   const [selected, setSelected] = useState<Classroom | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [grades, setGrades] = useState<GradeLevel[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classroomSubjects, setClassroomSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [classroomTeachers, setClassroomTeachers] = useState<Teacher[]>([]);
+  const [classroomTeachers, setClassroomTeachers] = useState<TeacherLink[]>([]);
+  // FIX #6: teacher link now requires subjectId
   const [addTeacherId, setAddTeacherId] = useState("");
+  const [addSubjectId, setAddSubjectId] = useState("");
   const LIMIT = 20;
 
-  const load = useCallback(
-    async (p = 1) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({
-          page: String(p),
-          limit: String(LIMIT),
-          ...(yearFilter ? { academicYearId: yearFilter } : {}),
-        });
-        const res = await api.fetchJson(`/classrooms?${params}`);
-        const data = res?.data ?? res ?? [];
-        setItems(data);
-        setTotal(res?.meta?.total ?? data.length);
-        setPage(p);
-      } catch (e: any) {
-        toast(e?.message || "Erro ao carregar turmas", "error");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [yearFilter],
-  );
+  const load = useCallback(async (p = 1) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
+      if (yearFilter) params.set("academicYearId", yearFilter);
+      const res = await api.fetchJson(`/classrooms?${params}`);
+      setItems(res?.data ?? res ?? []);
+      setTotal(res?.meta?.total ?? 0);
+      setPage(p);
+    } catch { toast("Erro ao carregar turmas", "error"); }
+    finally { setLoading(false); }
+  }, [yearFilter]);
+
+  useEffect(() => { load(1); }, [yearFilter]);
 
   useEffect(() => {
-    load(1);
-  }, [load]);
-
-  useEffect(() => {
-    async function loadRefs() {
+    async function loadMeta() {
       try {
-        const [y, g, t] = await Promise.all([
+        const [yRes, gRes, tRes, sRes] = await Promise.all([
           api.fetchJson("/academic-years?limit=50"),
-          api.fetchJson("/grade-levels?limit=50"),
-          api.fetchJson("/users?role=TEACHER&limit=100"),
+          api.fetchJson("/grade-levels?limit=100"),
+          api.fetchJson("/users?role=TEACHER&limit=200"),
+          api.fetchJson("/subjects?limit=200"),
         ]);
-        setYears(y?.data ?? y ?? []);
-        setGrades(g?.data ?? g ?? []);
-        setTeachers(
-          (t?.data ?? t ?? []).map((u: any) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-          })),
-        );
+        setYears(yRes?.data ?? yRes ?? []);
+        setGrades(gRes?.data ?? gRes ?? []);
+        setTeachers(tRes?.data ?? tRes ?? []);
+        setSubjects(sRes?.data ?? sRes ?? []);
       } catch {}
     }
-    loadRefs();
+    loadMeta();
   }, []);
 
-  const filtered = items.filter(
-    (c) =>
-      !search ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.gradeLevel?.name || "").toLowerCase().includes(search.toLowerCase()),
-  );
-
-  async function openTeachers(c: Classroom) {
-    setSelected(c);
-    setAddTeacherId("");
+  async function loadClassroomTeachers(classroomId: string) {
     try {
-      const res = await api.fetchJson(`/classrooms/${c.id}/teachers`);
-      const data = res?.data ?? res ?? [];
-      setClassroomTeachers(
-        data.map((r: any) => ({
-          id: r.teacher?.id || r.teacherId,
-          name: r.teacher?.name || "",
-          email: r.teacher?.email || "",
-        })),
-      );
-    } catch {
-      setClassroomTeachers([]);
-    }
-    setModal("teachers");
+      const [tRes, sRes] = await Promise.all([
+        api.fetchJson(`/classrooms/${classroomId}/teachers`),
+        api.fetchJson(`/classrooms/${classroomId}/subjects`),
+      ]);
+      setClassroomTeachers(tRes?.data ?? tRes ?? []);
+      setClassroomSubjects(sRes?.data ?? sRes ?? []);
+    } catch { toast("Erro ao carregar vínculos.", "error"); }
   }
 
-  async function handleAddTeacher() {
-    if (!selected || !addTeacherId) return;
-    setSaving(true);
-    try {
-      await api.fetchJson(`/classrooms/${selected.id}/teachers`, {
-        method: "POST",
-        body: JSON.stringify({ teacherId: addTeacherId }),
-      });
-      const t = teachers.find((t) => t.id === addTeacherId);
-      if (t) setClassroomTeachers((p) => [...p, t]);
-      setAddTeacherId("");
-      toast("Professor vinculado!");
-    } catch (e: any) {
-      toast(e?.message || "Erro ao vincular.", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
+  // FIX #7: only show years that can still receive classrooms
+  const activeYearOptions = years
+    .filter(y => y.status !== "ENCERRADO" && y.status !== "ARQUIVADO")
+    .map(y => ({ value: y.id, label: String(y.year) }));
 
-  async function handleRemoveTeacher(teacherId: string) {
-    if (!selected) return;
-    try {
-      await api.fetchJson(`/classrooms/${selected.id}/teachers/${teacherId}`, {
-        method: "DELETE",
-      });
-      setClassroomTeachers((p) => p.filter((t) => t.id !== teacherId));
-      toast("Professor removido.");
-    } catch (e: any) {
-      toast(e?.message || "Erro ao remover.", "error");
-    }
-  }
-
-  function openCreate() {
-    setForm(emptyForm());
-    setFormError("");
-    setSelected(null);
-    setModal("create");
-  }
-
-  function openEdit(c: Classroom) {
-    setForm({
-      name: c.name,
-      shift: c.shift,
-      capacity: String(c.capacity),
-      academicYearId: "",
-      gradeLevelId: "",
-    });
-    setFormError("");
-    setSelected(c);
-    setModal("edit");
-  }
+  const yearFilterOptions = years.map(y => ({ value: y.id, label: String(y.year) }));
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (
-      !form.name ||
-      !form.shift ||
-      !form.academicYearId ||
-      !form.gradeLevelId
-    ) {
-      setFormError("Todos os campos são obrigatórios.");
-      return;
+    if (!form.name || !form.shift || !form.academicYearId || !form.gradeLevelId) {
+      setFormError("Todos os campos são obrigatórios."); return;
     }
-    setSaving(true);
-    setFormError("");
+    setSaving(true); setFormError("");
     try {
       await api.fetchJson("/classrooms", {
         method: "POST",
-        body: JSON.stringify({
-          name: form.name,
-          shift: form.shift,
-          capacity: Number(form.capacity) || 30,
-          academicYearId: form.academicYearId,
-          gradeLevelId: form.gradeLevelId,
-        }),
+        body: JSON.stringify({ name: form.name, shift: form.shift, capacity: Number(form.capacity) || 30, academicYearId: form.academicYearId, gradeLevelId: form.gradeLevelId }),
       });
-      toast("Turma criada!");
-      setModal(null);
-      load(1);
-    } catch (e: any) {
-      setFormError(e?.message || "Erro ao criar.");
-    } finally {
-      setSaving(false);
-    }
+      toast("Turma criada!"); setModal(null); load(1);
+    } catch (e: any) { setFormError(e?.message || "Erro ao criar."); }
+    finally { setSaving(false); }
   }
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
-    setSaving(true);
-    setFormError("");
+    setSaving(true); setFormError("");
     try {
       await api.fetchJson(`/classrooms/${selected.id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          name: form.name,
-          shift: form.shift,
-          capacity: Number(form.capacity),
-        }),
+        body: JSON.stringify({ name: form.name, shift: form.shift, capacity: Number(form.capacity) }),
       });
-      toast("Turma atualizada!");
-      setModal(null);
-      load(page);
-    } catch (e: any) {
-      setFormError(e?.message || "Erro ao atualizar.");
-    } finally {
-      setSaving(false);
-    }
+      toast("Turma atualizada!"); setModal(null); load(page);
+    } catch (e: any) { setFormError(e?.message || "Erro ao atualizar."); }
+    finally { setSaving(false); }
   }
 
-  const yearOptions = years.map((y) => ({
-    value: y.id,
-    label: String(y.year),
-  }));
+  async function handleDelete() {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await api.fetchJson(`/classrooms/${selected.id}`, { method: "DELETE" });
+      toast("Turma removida!"); setModal(null); load(page);
+    } catch (e: any) { toast(e?.message || "Erro ao remover.", "error"); }
+    finally { setSaving(false); }
+  }
 
-  const columns = [
-    { key: "name", label: "Turma" },
-    { key: "grade", label: "Série" },
-    { key: "shift", label: "Turno", width: 100 },
-    { key: "year", label: "Ano letivo", width: 110 },
-    { key: "students", label: "Alunos", width: 80 },
-    { key: "actions", label: "", width: 100 },
-  ];
+  // FIX #6: send subjectId when linking teacher
+  async function handleAddTeacher() {
+    if (!selected || !addTeacherId || !addSubjectId) {
+      toast("Selecione o professor e a disciplina.", "error"); return;
+    }
+    setSaving(true);
+    try {
+      await api.fetchJson(`/classrooms/${selected.id}/teachers`, {
+        method: "POST",
+        body: JSON.stringify({ teacherId: addTeacherId, subjectId: addSubjectId, dateFrom: new Date().toISOString().slice(0, 10) }),
+      });
+      setAddTeacherId(""); setAddSubjectId("");
+      loadClassroomTeachers(selected.id);
+      toast("Professor vinculado!");
+    } catch (e: any) { toast(e?.message || "Erro ao vincular.", "error"); }
+    finally { setSaving(false); }
+  }
 
-  const rows = filtered.map((c) => [
-    <span style={{ fontWeight: 600, color: "#111827" }}>{c.name}</span>,
-    <span style={{ color: "#6b7280" }}>{c.gradeLevel?.name || "—"}</span>,
-    <StatusBadge
-      label={SHIFT_LABELS[c.shift] || c.shift}
-      color={SHIFT_COLORS[c.shift] || "gray"}
-    />,
-    <span style={{ color: "#6b7280" }}>{c.academicYear?.year || "—"}</span>,
-    <span style={{ fontWeight: 700, color: "#374151" }}>
-      {c._count?.enrollments ?? "—"}
-    </span>,
+  async function handleRemoveTeacher(linkId: string) {
+    if (!selected) return;
+    try {
+      await api.fetchJson(`/classrooms/${selected.id}/teachers/${linkId}/remove`, { method: "PATCH" });
+      loadClassroomTeachers(selected.id);
+      toast("Professor removido.");
+    } catch (e: any) { toast(e?.message || "Erro ao remover.", "error"); }
+  }
+
+  function openCreate() { setForm(emptyForm()); setFormError(""); setSelected(null); setModal("create"); }
+  function openEdit(c: Classroom) {
+    setForm({ name: c.name, shift: c.shift, capacity: String(c.capacity), academicYearId: "", gradeLevelId: "" });
+    setFormError(""); setSelected(c); setModal("edit");
+  }
+
+  const columns = ["Turma", "Série", "Ano", "Turno", "Vagas", "Ações"];
+  const rows = items.map(c => [
+    <span style={{ fontWeight: 700 }}>{c.name}</span>,
+    c.gradeLevel?.name || <span style={{ color: "#9ca3af" }}>—</span>,
+    c.academicYear?.year || "—",
+    <StatusBadge label={SHIFT_LABELS[c.shift] || c.shift} color={SHIFT_COLORS[c.shift] || "gray"} />,
+    `${c._count?.enrollments ?? 0} / ${c.capacity}`,
     <div style={{ display: "flex", gap: 4 }}>
+      <IconButton onClick={() => { setSelected(c); loadClassroomTeachers(c.id); setAddTeacherId(""); setAddSubjectId(""); setModal("teachers"); }} title="Professores">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      </IconButton>
       <IconButton onClick={() => openEdit(c)} title="Editar">
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
       </IconButton>
-      <IconButton onClick={() => openTeachers(c)} title="Professores">
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <IconButton onClick={() => { setSelected(c); setModal("delete"); }} title="Remover" variant="danger">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
         </svg>
       </IconButton>
     </div>,
   ]);
 
-  const activeYear = years.find((y) => y.status === "EM_ANDAMENTO");
-
   return (
     <PageShell
       title="Turmas"
-      description="Gerencie as turmas da escola, vincule professores e acompanhe matrículas."
+      description="Gerencie as turmas, vínculos de professores e disciplinas."
       action={<PrimaryButton onClick={openCreate}>+ Nova turma</PrimaryButton>}
     >
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <StatCard
-          label="Total de turmas"
-          value={total}
-          color="#0891b2"
-          sub={activeYear ? `Ano ${activeYear.year}` : undefined}
-          icon={
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-            </svg>
-          }
-        />
-      </div>
-
       <Card>
-        <div
-          style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9" }}
-        >
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nome ou série..."
-          >
-            <SelectFilter
-              value={yearFilter}
-              onChange={(v) => {
-                setYearFilter(v);
-                load(1);
-              }}
-              options={yearOptions}
-              placeholder="Todos os anos"
-            />
-          </SearchBar>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <SelectFilter value={yearFilter} onChange={setYearFilter} options={yearFilterOptions} placeholder="Todos os anos letivos" />
         </div>
-        <DataTable
-          columns={columns}
-          rows={rows}
-          loading={loading}
-          emptyMessage="Nenhuma turma encontrada."
-        />
+        <DataTable columns={columns} rows={rows} loading={loading} emptyMessage="Nenhuma turma encontrada." />
         <Pagination page={page} total={total} limit={LIMIT} onPage={load} />
       </Card>
 
-      <Modal
-        open={modal === "create"}
-        onClose={() => setModal(null)}
-        title="Nova turma"
-      >
+      {/* CREATE */}
+      <Modal open={modal === "create"} onClose={() => setModal(null)} title="Nova turma">
         <form onSubmit={handleCreate}>
-          {formError && (
-            <div style={{ marginBottom: 14 }}>
-              <InlineAlert message={formError} type="error" />
-            </div>
-          )}
+          {formError && <div style={{ marginBottom: 14 }}><InlineAlert message={formError} type="error" /></div>}
           <FormField label="Nome da turma" required>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Ex: 5º Ano A"
-              style={{
-                width: "100%",
-                height: 40,
-                padding: "0 12px",
-                borderRadius: 9,
-                border: "1.5px solid #e2e8f0",
-                fontSize: 13,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: 7º Ano A" style={inputStyle} />
           </FormField>
           <FormField label="Ano letivo" required>
-            <Select
-              value={form.academicYearId}
-              onChange={(v) => setForm((f) => ({ ...f, academicYearId: v }))}
-              options={yearOptions}
-              placeholder="Selecione..."
-            />
+            <Select value={form.academicYearId} onChange={v => setForm(f => ({ ...f, academicYearId: v }))} options={activeYearOptions} placeholder="Selecione..." />
           </FormField>
-          <FormField label="Série/Nível" required>
-            <Select
-              value={form.gradeLevelId}
-              onChange={(v) => setForm((f) => ({ ...f, gradeLevelId: v }))}
-              options={grades.map((g) => ({ value: g.id, label: g.name }))}
-              placeholder="Selecione..."
-            />
+          <FormField label="Série / Nível" required>
+            <Select value={form.gradeLevelId} onChange={v => setForm(f => ({ ...f, gradeLevelId: v }))} options={grades.map(g => ({ value: g.id, label: g.name }))} placeholder="Selecione..." />
           </FormField>
           <FormField label="Turno" required>
-            <Select
-              value={form.shift}
-              onChange={(v) => setForm((f) => ({ ...f, shift: v }))}
-              options={SHIFT_OPTIONS}
-              placeholder="Selecione..."
-            />
+            <Select value={form.shift} onChange={v => setForm(f => ({ ...f, shift: v }))} options={SHIFT_OPTIONS} placeholder="Selecione..." />
           </FormField>
           <FormField label="Capacidade">
-            <input
-              type="number"
-              value={form.capacity}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, capacity: e.target.value }))
-              }
-              min={1}
-              max={100}
-              style={{
-                width: "100%",
-                height: 40,
-                padding: "0 12px",
-                borderRadius: 9,
-                border: "1.5px solid #e2e8f0",
-                fontSize: 13,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
+            <input type="number" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} min={1} max={200} style={inputStyle} />
           </FormField>
           <ModalFooter>
-            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>
-              Cancelar
-            </PrimaryButton>
-            <PrimaryButton type="submit" loading={saving}>
-              Criar turma
-            </PrimaryButton>
+            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
+            <PrimaryButton type="submit" loading={saving}>Criar turma</PrimaryButton>
           </ModalFooter>
         </form>
       </Modal>
 
-      <Modal
-        open={modal === "edit"}
-        onClose={() => setModal(null)}
-        title="Editar turma"
-      >
+      {/* EDIT */}
+      <Modal open={modal === "edit"} onClose={() => setModal(null)} title="Editar turma">
         <form onSubmit={handleEdit}>
-          {formError && (
-            <div style={{ marginBottom: 14 }}>
-              <InlineAlert message={formError} type="error" />
-            </div>
-          )}
+          {formError && <div style={{ marginBottom: 14 }}><InlineAlert message={formError} type="error" /></div>}
           <FormField label="Nome da turma" required>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              style={{
-                width: "100%",
-                height: 40,
-                padding: "0 12px",
-                borderRadius: 9,
-                border: "1.5px solid #e2e8f0",
-                fontSize: 13,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
           </FormField>
           <FormField label="Turno" required>
-            <Select
-              value={form.shift}
-              onChange={(v) => setForm((f) => ({ ...f, shift: v }))}
-              options={SHIFT_OPTIONS}
-              placeholder="Selecione..."
-            />
+            <Select value={form.shift} onChange={v => setForm(f => ({ ...f, shift: v }))} options={SHIFT_OPTIONS} placeholder="Selecione..." />
           </FormField>
           <FormField label="Capacidade">
-            <input
-              type="number"
-              value={form.capacity}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, capacity: e.target.value }))
-              }
-              min={1}
-              style={{
-                width: "100%",
-                height: 40,
-                padding: "0 12px",
-                borderRadius: 9,
-                border: "1.5px solid #e2e8f0",
-                fontSize: 13,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
+            <input type="number" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} min={1} max={200} style={inputStyle} />
           </FormField>
           <ModalFooter>
-            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>
-              Cancelar
-            </PrimaryButton>
-            <PrimaryButton type="submit" loading={saving}>
-              Salvar
-            </PrimaryButton>
+            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
+            <PrimaryButton type="submit" loading={saving}>Salvar</PrimaryButton>
           </ModalFooter>
         </form>
       </Modal>
 
-      <Modal
-        open={modal === "teachers"}
-        onClose={() => setModal(null)}
-        title={`Professores — ${selected?.name || ""}`}
-        width={520}
-      >
+      {/* DELETE */}
+      <Modal open={modal === "delete"} onClose={() => setModal(null)} title="Remover turma">
+        <p style={{ margin: "0 0 20px", color: "#374151" }}>
+          Remover a turma <strong>{selected?.name}</strong>? Matrículas vinculadas também serão afetadas.
+        </p>
+        <ModalFooter>
+          <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
+          <PrimaryButton variant="danger" onClick={handleDelete} loading={saving}>Remover</PrimaryButton>
+        </ModalFooter>
+      </Modal>
+
+      {/* TEACHERS — FIX #6: now includes subject selector */}
+      <Modal open={modal === "teachers"} onClose={() => setModal(null)} title={`Professores — ${selected?.name}`} width={600}>
         <div style={{ marginBottom: 16 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6b7280" }}>
-            Professores vinculados a esta turma:
-          </p>
-          {classroomTeachers.length === 0 ? (
-            <p style={{ color: "#9ca3af", fontSize: 13 }}>
-              Nenhum professor vinculado.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {classroomTeachers.map((t) => (
-                <div
-                  key={t.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 12px",
-                    background: "#f8fafc",
-                    borderRadius: 9,
-                    border: "1px solid #e9ebf0",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>
-                      {t.name}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "#6b7280" }}>
-                      {t.email}
-                    </div>
-                  </div>
-                  <IconButton
-                    onClick={() => handleRemoveTeacher(t.id)}
-                    title="Remover"
-                    variant="danger"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14H6L5 6" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                    </svg>
-                  </IconButton>
-                </div>
-              ))}
+          <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>Vincular professor</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <Select value={addTeacherId} onChange={setAddTeacherId}
+                options={teachers.map(t => ({ value: t.id, label: t.name }))}
+                placeholder="Selecione o professor..." />
             </div>
-          )}
-        </div>
-        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
-          <p
-            style={{
-              margin: "0 0 8px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: "#374151",
-            }}
-          >
-            Adicionar professor:
-          </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              <Select
-                value={addTeacherId}
-                onChange={setAddTeacherId}
-                options={teachers
-                  .filter(
-                    (t) => !classroomTeachers.find((ct) => ct.id === t.id),
-                  )
-                  .map((t) => ({ value: t.id, label: t.name }))}
-                placeholder="Selecione um professor..."
-              />
+            <div style={{ flex: 1, minWidth: 140 }}>
+              {/* FIX #6: disciplina obrigatória no vínculo */}
+              <Select value={addSubjectId} onChange={setAddSubjectId}
+                options={subjects.map(s => ({ value: s.id, label: s.name }))}
+                placeholder="Selecione a disciplina..." />
             </div>
-            <PrimaryButton
-              onClick={handleAddTeacher}
-              disabled={!addTeacherId}
-              loading={saving}
-            >
+            <PrimaryButton onClick={handleAddTeacher} loading={saving} disabled={!addTeacherId || !addSubjectId}>
               Vincular
             </PrimaryButton>
           </div>
+        </div>
+        <div>
+          <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>Professores vinculados</p>
+          {classroomTeachers.length === 0 ? (
+            <p style={{ color: "#9ca3af", fontSize: 13, padding: "12px 0" }}>Nenhum professor vinculado.</p>
+          ) : (
+            classroomTeachers.map(link => (
+              <div key={link.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "#f8fafc", borderRadius: 8, marginBottom: 6 }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{link.teacher?.name}</span>
+                  {link.subject && (
+                    <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280", background: "#e2e8f0", padding: "2px 8px", borderRadius: 6 }}>{link.subject.name}</span>
+                  )}
+                </div>
+                <IconButton onClick={() => handleRemoveTeacher(link.id)} title="Desvincular" variant="danger">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </IconButton>
+              </div>
+            ))
+          )}
         </div>
       </Modal>
     </PageShell>
