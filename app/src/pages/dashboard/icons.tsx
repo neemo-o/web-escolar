@@ -1,4 +1,4 @@
-import React from 'react'
+import { ROLE_COLORS } from "./constants";
 
 export function iconSchool() {
   return (

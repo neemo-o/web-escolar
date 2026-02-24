@@ -3,12 +3,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useWindowSize } from "./dashboard/useWindowSize";
 import Avatar from "./dashboard/Avatar";
-import SchoolLogo from "./dashboard/SchoolLogo";
 import Sidebar from "./dashboard/Sidebar";
 // PagePlaceholder moved to child routes; Dashboard renders an <Outlet />
 import { PAGE_TITLES } from "./dashboard/nav";
 import { ROLE_COLORS, ROLE_LABELS } from "./dashboard/constants";
-import { iconMenu, iconClose, iconLogout, iconPerson } from "./dashboard/icons";
+import { iconMenu, iconClose, iconLogout } from "./dashboard/icons";
 
 export default function Dashboard() {
   const { user: authUser, school: authSchool, logout, isLoading } = useAuth();

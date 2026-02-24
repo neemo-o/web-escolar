@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../utils/api";
-import { Card, StatCard, toast } from "../../../../components/ui";
+import { PageShell, Card, StatCard, toast } from "../../../../components/ui";
 
 const SHORTCUTS: Record<string, { label: string; icon: React.ReactNode; path: string; color: string }[]> = {
   TEACHER: [
@@ -137,8 +137,10 @@ export default function Overview() {
   const isSecretaryOrAdmin = role === "SECRETARY" || role === "ADMIN_GLOBAL";
 
   return (
-    <div style={{ maxWidth: 900 }}>
-      {isSecretaryOrAdmin ? <SecretaryPanel /> : <GenericPanel role={role} user={user} />}
-    </div>
+    <PageShell title="Painel" description="Visão geral do sistema.">
+      <div style={{ maxWidth: 900 }}>
+        {isSecretaryOrAdmin ? <SecretaryPanel /> : <GenericPanel role={role} user={user} />}
+      </div>
+    </PageShell>
   );
 }

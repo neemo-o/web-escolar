@@ -1,4 +1,3 @@
-import React from 'react'
 import { PAGE_TITLES } from './nav'
 import { ROLE_COLORS, ROLE_LABELS } from './constants'
 import { iconHome, iconSchool, iconUsers, iconBook, iconStar, iconClipboard, iconChart, iconCalendar, iconGrid, iconKey } from './icons'
@@ -24,10 +23,10 @@ export function PagePlaceholder({ pageId, user }: { pageId: string; user: any })
   const data = placeholderData[pageId] || { icon: iconGrid(), description: `Conteúdo de ${title}.`, hint: 'Esta seção está em desenvolvimento.' }
 
   return (
-    <div style={{ padding: '32px 32px', flex: 1, overflowY: 'auto' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.5px' }}>{title}</h1>
-        <p style={{ color: '#6b7280', fontSize: 13.5, margin: '4px 0 0' }}>{data.description}</p>
+    <div style={{ padding: '28px 28px 40px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.5px' }}>{title}</h1>
+        <p style={{ color: '#6b7280', fontSize: 13, margin: '3px 0 0' }}>{data.description}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, background: '#f9fafb', borderRadius: 16, border: '1.5px dashed #e5e7eb', gap: 12 }}>

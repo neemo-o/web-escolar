@@ -27,4 +27,3 @@ export const MOCK_SCHOOL = {
   color: "#4f46e5",
 };
 
-export default {};

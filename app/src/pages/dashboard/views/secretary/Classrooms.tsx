@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
 import {
   PageShell, Card, PrimaryButton, SearchBar, SelectFilter, DataTable, Pagination,
@@ -172,7 +172,14 @@ export default function Classrooms() {
     setFormError(""); setSelected(c); setModal("edit");
   }
 
-  const columns = ["Turma", "Série", "Ano", "Turno", "Vagas", "Ações"];
+  const columns = [
+  { key: "name", label: "Turma", width: 200 },
+  { key: "gradeLevel", label: "Série", width: 120 },
+  { key: "academicYear", label: "Ano", width: 80 },
+  { key: "shift", label: "Turno", width: 100 },
+  { key: "capacity", label: "Vagas", width: 100 },
+  { key: "actions", label: "Ações", width: 200 },
+];
   const rows = items.map(c => [
     <span style={{ fontWeight: 700 }}>{c.name}</span>,
     c.gradeLevel?.name || <span style={{ color: "#9ca3af" }}>—</span>,

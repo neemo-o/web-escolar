@@ -14,6 +14,7 @@ import classroomSubjectsRoutes from "./modules/classroom-subjects/classroom-subj
 import studentsRoutes from "./modules/students/students.routes";
 import enrollmentsRoutes from "./modules/enrollments/enrollments.routes";
 import assessmentsRoutes from "./modules/assessments/assessments.routes";
+import profileRoutes from "./modules/profile/profiles.routes";
 import gradesRoutes from "./modules/grades/grades.routes";
 import attendanceRoutes from "./modules/attendance/attendance.routes";
 import { authenticate } from "./middlewares/authenticate";
@@ -51,7 +52,7 @@ app.use(enrollmentsRoutes);
 app.use(assessmentsRoutes);
 app.use(gradesRoutes);
 app.use(attendanceRoutes);
-
+app.use(profileRoutes);
 app.use(usersRoutes);
 
 // Global error handler

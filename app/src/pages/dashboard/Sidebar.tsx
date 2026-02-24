@@ -106,7 +106,7 @@ export default function Sidebar({
             pointerEvents: "none",
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
           <SchoolLogo
             name={
               school?.name ??

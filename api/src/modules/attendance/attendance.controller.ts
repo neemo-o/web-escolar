@@ -8,10 +8,9 @@ import getParam from "../../utils/getParam";
 export async function createSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
   const createdById = (req.user as any)?.id;
-  const { classroomId, subjectId, sessionDate, startTime, endTime, notes } =
-    req.body;
+  const { classroomId, subjectId, date, totalSlots, notes } = req.body;
 
-  if (!classroomId || !subjectId || !sessionDate || !startTime || !endTime) {
+  if (!classroomId || !subjectId || !date) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -32,9 +31,8 @@ export async function createSession(req: Request, res: Response) {
       classroomId,
       subjectId,
       createdById,
-      sessionDate: new Date(sessionDate),
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
+      date: new Date(date),
+      totalSlots: totalSlots ?? 1,
       notes,
     });
     return res.status(201).json(created);
@@ -56,8 +54,8 @@ export async function listSessions(req: Request, res: Response) {
   if (req.query.classroomId)
     filters.classroomId = String(req.query.classroomId);
   if (req.query.subjectId) filters.subjectId = String(req.query.subjectId);
-  if (req.query.sessionDate)
-    filters.sessionDate = String(req.query.sessionDate);
+  if (req.query.date)
+    filters.date = String(req.query.date);
 
   const requester = req.user!;
   if (requester.role === "TEACHER") {
@@ -143,12 +141,10 @@ export async function updateSession(req: Request, res: Response) {
   if (!existing) return res.status(404).json({ error: "Session not found" });
 
   const data: any = {};
-  ["sessionDate", "startTime", "endTime", "notes"].forEach((k) => {
+  ["date", "totalSlots", "notes"].forEach((k) => {
     if (req.body[k] !== undefined) data[k] = req.body[k];
   });
-  if (data.sessionDate) data.sessionDate = new Date(data.sessionDate);
-  if (data.startTime) data.startTime = new Date(data.startTime);
-  if (data.endTime) data.endTime = new Date(data.endTime);
+  if (data.date) data.date = new Date(data.date);
 
   const updated = await service.updateSession(id, data);
   return res.json(updated);
@@ -159,7 +155,7 @@ export async function removeSession(req: Request, res: Response) {
   const id = getParam(req, "id");
   const existing = await service.findSessionById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Session not found" });
-  await service.softDeleteSession(id);
+  await prisma.attendanceSession.delete({ where: { id } });
   return res.status(204).send();
 }
 
@@ -168,8 +164,9 @@ export async function markRecords(req: Request, res: Response) {
   const sessionId = getParam(req, "id");
   const items: Array<{
     enrollmentId: string;
-    status: string;
-    justification?: string;
+    present: boolean;
+    justified?: boolean;
+    notes?: string;
   }> = req.body.records || [];
 
   const session = await service.findSessionById(sessionId, schoolId);
@@ -186,8 +183,9 @@ export async function markRecords(req: Request, res: Response) {
         schoolId,
         sessionId,
         it.enrollmentId,
-        it.status,
-        it.justification,
+        it.present,
+        it.justified,
+        it.notes,
       );
       results.push(r);
     }

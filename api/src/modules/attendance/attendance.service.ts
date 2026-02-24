@@ -14,13 +14,13 @@ export function findSessions(
       : filters.classroomId;
   }
   if (filters.subjectId) where.subjectId = filters.subjectId;
-  if (filters.sessionDate)
-    where.sessionDate = new Date(String(filters.sessionDate));
+  if (filters.date)
+    where.date = new Date(String(filters.date));
   return prisma.attendanceSession.findMany({
     where,
     skip,
     take,
-    orderBy: { sessionDate: "desc" },
+    orderBy: { date: "desc" },
   });
 }
 
@@ -32,8 +32,8 @@ export function countSessions(schoolId: string, filters: SessionFilters) {
       : filters.classroomId;
   }
   if (filters?.subjectId) where.subjectId = filters.subjectId;
-  if (filters?.sessionDate)
-    where.sessionDate = new Date(String(filters.sessionDate));
+  if (filters?.date)
+    where.date = new Date(String(filters.date));
   return prisma.attendanceSession.count({ where });
 }
 
@@ -49,30 +49,24 @@ export function updateSession(id: string, data: any) {
   return prisma.attendanceSession.update({ where: { id }, data });
 }
 
-export function softDeleteSession(id: string) {
-  return prisma.attendanceSession.update({
-    where: { id },
-    data: { deletedAt: new Date() },
-  });
-}
-
 export async function upsertRecord(
   schoolId: string,
   sessionId: string,
   enrollmentId: string,
-  status: string,
-  justification?: string,
+  present: boolean,
+  justified?: boolean,
+  notes?: string,
 ) {
   const existing = await prisma.attendanceRecord.findFirst({
     where: { sessionId, enrollmentId },
   });
   if (!existing) {
     return prisma.attendanceRecord.create({
-      data: { schoolId, sessionId, enrollmentId, status, justification },
+      data: { schoolId, sessionId, enrollmentId, present, justified: justified ?? false, notes },
     });
   }
   return prisma.attendanceRecord.update({
     where: { id: existing.id },
-    data: { status, justification },
+    data: { present, justified: justified ?? false, notes },
   });
 }

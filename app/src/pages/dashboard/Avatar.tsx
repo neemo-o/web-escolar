@@ -1,4 +1,3 @@
-import React from "react";
 import { ROLE_COLORS } from "./constants";
 
 export function Avatar({ user, size = 40 }: { user: any; size?: number }) {

@@ -85,7 +85,12 @@ export default function GradeLevels() {
     setFormError(""); setSelected(item); setModal("edit");
   }
 
-  const columns = ["Nome", "Código", "Ordem", "Ações"];
+  const columns = [
+    { key: "name", label: "Nome" },
+    { key: "code", label: "Código" },
+    { key: "sortOrder", label: "Ordem" },
+    { key: "actions", label: "Ações" },
+  ];
   const rows = items.map(item => [
     <span style={{ fontWeight: 600 }}>{item.name}</span>,
     <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>{item.code}</code>,

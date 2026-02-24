@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 const accent = "#0891b2";
 
@@ -159,11 +159,13 @@ export function SearchBar({
   value,
   onChange,
   placeholder,
+  onSearch,
   children,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  onSearch?: () => void;
   children?: React.ReactNode;
 }) {
   return (
@@ -199,6 +201,9 @@ export function SearchBar({
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onSearch) onSearch();
+          }}
           placeholder={placeholder || "Buscar..."}
           style={{
             width: "100%",
@@ -264,14 +269,60 @@ export function SelectFilter({
 export function DataTable({
   columns,
   rows,
+  data,
   loading,
   emptyMessage,
 }: {
-  columns: { key: string; label: string; width?: number | string }[];
-  rows: React.ReactNode[][];
+  columns: { key: string; label: string; width?: number | string; render?: (row: any) => React.ReactNode }[];
+  rows?: React.ReactNode[][];
+  data?: any[];
   loading?: boolean;
   emptyMessage?: string;
 }) {
+  // Support both API styles: rows (2D array) or data + render functions
+  const renderRows = () => {
+    if (data && columns.some(c => c.render)) {
+      // New API: data array with render functions
+      return data.map((row, i) => (
+        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+          {columns.map((col, j) => (
+            <td
+              key={j}
+              style={{
+                padding: "11px 14px",
+                color: "#374151",
+                verticalAlign: "middle",
+              }}
+            >
+              {col.render ? col.render(row) : null}
+            </td>
+          ))}
+        </tr>
+      ));
+    } else if (rows) {
+      // Old API: 2D array of ReactNode
+      return rows.map((row, i) => (
+        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+          {row.map((cell, j) => (
+            <td
+              key={j}
+              style={{
+                padding: "11px 14px",
+                color: "#374151",
+                verticalAlign: "middle",
+              }}
+            >
+              {cell}
+            </td>
+          ))}
+        </tr>
+      ));
+    }
+    return null;
+  };
+
+  const hasData = (data && data.length > 0) || (rows && rows.length > 0);
+
   return (
     <div style={{ width: "100%", overflowX: "auto" }}>
       <table
@@ -321,7 +372,7 @@ export function DataTable({
                 Carregando...
               </td>
             </tr>
-          ) : rows.length === 0 ? (
+          ) : !hasData ? (
             <tr>
               <td
                 colSpan={columns.length}
@@ -335,22 +386,7 @@ export function DataTable({
               </td>
             </tr>
           ) : (
-            rows.map((row, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                {row.map((cell, j) => (
-                  <td
-                    key={j}
-                    style={{
-                      padding: "11px 14px",
-                      color: "#374151",
-                      verticalAlign: "middle",
-                    }}
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))
+            renderRows()
           )}
         </tbody>
       </table>
@@ -363,12 +399,15 @@ export function Pagination({
   total,
   limit,
   onPage,
+  onChange,
 }: {
   page: number;
   total: number;
   limit: number;
-  onPage: (p: number) => void;
+  onPage?: (p: number) => void;
+  onChange?: (p: number) => void;
 }) {
+  const handlePageChange = onPage || onChange || (() => {});
   const pages = Math.ceil(total / limit);
   if (total === 0) return null;
 
@@ -412,7 +451,7 @@ export function Pagination({
       </span>
       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
         <button
-          onClick={() => onPage(page - 1)}
+          onClick={() => handlePageChange(page - 1)}
           disabled={page === 1}
           style={paginBtn(page === 1)}
           title="Anterior"
@@ -430,7 +469,7 @@ export function Pagination({
           ) : (
             <button
               key={p}
-              onClick={() => onPage(p as number)}
+              onClick={() => handlePageChange(p as number)}
               style={paginBtn(false, p === page)}
             >
               {p}
@@ -438,7 +477,7 @@ export function Pagination({
           ),
         )}
         <button
-          onClick={() => onPage(page + 1)}
+          onClick={() => handlePageChange(page + 1)}
           disabled={page === pages}
           style={paginBtn(page === pages)}
           title="Próxima"
@@ -470,9 +509,11 @@ function paginBtn(disabled: boolean, active = false): React.CSSProperties {
 export function StatusBadge({
   label,
   color,
+  status,
 }: {
   label: string;
-  color: "green" | "red" | "yellow" | "blue" | "gray" | "purple";
+  color?: "green" | "red" | "yellow" | "blue" | "gray" | "purple";
+  status?: string;
 }) {
   const map: Record<string, { bg: string; text: string }> = {
     green: { bg: "#dcfce7", text: "#166534" },
@@ -482,7 +523,7 @@ export function StatusBadge({
     gray: { bg: "#f3f4f6", text: "#4b5563" },
     purple: { bg: "#f3e8ff", text: "#6b21a8" },
   };
-  const c = map[color] || map.gray;
+  const c = map[color || "gray"] || map.gray;
   return (
     <span
       style={{
@@ -501,17 +542,49 @@ export function StatusBadge({
   );
 }
 
+const ICON_MAP: Record<string, React.ReactNode> = {
+  edit: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  ),
+  delete: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  ),
+  view: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  check: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+};
+
 export function IconButton({
   onClick,
   title,
   variant = "default",
+  icon,
   children,
 }: {
   onClick: () => void;
   title?: string;
   variant?: "default" | "danger";
-  children: React.ReactNode;
+  icon?: string;
+  children?: React.ReactNode;
 }) {
+  const iconEl = icon && ICON_MAP[icon] ? ICON_MAP[icon] : children;
   return (
     <button
       onClick={onClick}
@@ -531,7 +604,7 @@ export function IconButton({
         flexShrink: 0,
       }}
     >
-      {children}
+      {iconEl}
     </button>
   );
 }

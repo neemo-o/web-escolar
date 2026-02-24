@@ -51,10 +51,14 @@ export function getNavGroups(role: string): NavGroup[] {
 
     case "SECRETARY":
       return [
-        { label: "Visão Geral", items: [{ id: "overview", label: "Painel", icon: iconHome() }] },
         {
-          label: "Gestão Escolar",
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel", icon: iconHome() }],
+        },
+        {
+          label: "Cadastros",
           items: [
+            { id: "students", label: "Alunos", icon: iconUsers() },
             { id: "users", label: "Usuários", icon: iconUsers() },
             { id: "classrooms", label: "Turmas", icon: iconBook() },
             { id: "enrollments", label: "Matrículas", icon: iconClipboard() },
@@ -76,7 +80,16 @@ export function getNavGroups(role: string): NavGroup[] {
             { id: "reports", label: "Relatórios", icon: iconChart() },
           ],
         },
-        { label: "Administração", items: [{ id: "reset-password", label: "Redefinir Senhas", icon: iconKey() }] },
+        {
+          label: "Administração",
+          items: [
+            {
+              id: "reset-password",
+              label: "Redefinir Senhas",
+              icon: iconKey(),
+            },
+          ],
+        },
       ];
 
     case "TEACHER":
@@ -150,6 +163,7 @@ export const PAGE_TITLES: Record<string, string> = {
   assessments: "Avaliações",
   grades: "Notas",
   progress: "Progresso",
+  "students": "Alunos",
   "my-grades": "Minhas Notas",
   "my-assessments": "Avaliações",
   "my-progress": "Progresso",

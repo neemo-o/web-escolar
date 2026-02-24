@@ -1,6 +1,5 @@
-import React from 'react'
+import { useAuth } from '../../../../contexts/AuthContext';
 import PagePlaceholder from '../../PagePlaceholder'
-import { useAuth } from '../../../../contexts/AuthContext'
 
 export default function MyClassrooms() {
   const { user } = useAuth()

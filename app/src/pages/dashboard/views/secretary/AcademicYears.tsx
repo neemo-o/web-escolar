@@ -140,7 +140,13 @@ export default function AcademicYears() {
 
   function fmt(d: string) { return d ? new Date(d).toLocaleDateString("pt-BR") : "—"; }
 
-  const columns = ["Ano", "Período", "Status", "Ano Ativo", "Ações"];
+  const columns = [
+    { key: "year", label: "Ano" },
+    { key: "period", label: "Período" },
+    { key: "status", label: "Status" },
+    { key: "active", label: "Ano Ativo" },
+    { key: "actions", label: "Ações" },
+  ];
   const rows = years.map((y) => [
     <span style={{ fontWeight: 700 }}>{y.year}</span>,
     `${fmt(y.startDate)} → ${fmt(y.endDate)}`,
@@ -171,7 +177,13 @@ export default function AcademicYears() {
     </div>,
   ]);
 
-  const periodColumns = ["Nome", "Seq.", "Período", "Status", "Ação"];
+  const periodColumns = [
+    { key: "name", label: "Nome" },
+    { key: "sequence", label: "Seq." },
+    { key: "period", label: "Período" },
+    { key: "status", label: "Status" },
+    { key: "action", label: "Ação" },
+  ];
   const periodRows = periods.map((p) => [
     p.name,
     p.sequence,

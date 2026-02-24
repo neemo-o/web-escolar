@@ -1,37 +1,84 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
 import {
-  PageShell, Card, PrimaryButton, SearchBar, SelectFilter, DataTable,
-  Pagination, StatusBadge, IconButton, Modal, FormField, Input, Select,
-  ModalFooter, InlineAlert, toast,
+  PageShell,
+  Card,
+  PrimaryButton,
+  SearchBar,
+  SelectFilter,
+  DataTable,
+  Pagination,
+  StatusBadge,
+  IconButton,
+  Modal,
+  FormField,
+  Input,
+  Select,
+  ModalFooter,
+  InlineAlert,
+  toast,
 } from "../../../../components/ui";
+import TeacherProfileModal from "../../../../components/TeacherProfileModal";
+import GuardianProfileModal from "../../../../components/GuardianProfileModal";
 
-// FIX #22: SECRETARY removed from creation dropdown (backend already blocks it, but confuses UI)
 const ROLE_OPTIONS = [
   { value: "TEACHER", label: "Professor" },
-  { value: "STUDENT", label: "Aluno" },
   { value: "GUARDIAN", label: "Responsável" },
+  { value: "SECRETARY", label: "Secretaria" },
 ];
+
 const ROLE_FILTER_OPTIONS = [
   { value: "TEACHER", label: "Professor" },
   { value: "SECRETARY", label: "Secretaria" },
-  { value: "STUDENT", label: "Aluno" },
   { value: "GUARDIAN", label: "Responsável" },
 ];
+
 const ROLE_LABELS: Record<string, string> = {
-  SECRETARY: "Secretaria", TEACHER: "Professor", STUDENT: "Aluno",
-  GUARDIAN: "Responsável", ADMIN_GLOBAL: "Admin Global",
-};
-const ROLE_COLORS: Record<string, "blue" | "green" | "yellow" | "purple" | "gray"> = {
-  SECRETARY: "blue", TEACHER: "green", STUDENT: "yellow", GUARDIAN: "purple", ADMIN_GLOBAL: "gray",
+  SECRETARY: "Secretaria",
+  TEACHER: "Professor",
+  STUDENT: "Aluno",
+  GUARDIAN: "Responsável",
+  ADMIN_GLOBAL: "Admin Global",
 };
 
-type User = { id: string; name: string; email: string; role: string; phone?: string; active: boolean; createdAt: string };
-type Student = { id: string; name: string };
-type CreateForm = { role: string; name: string; email: string; phone: string; password: string; cpf: string; birthDate: string; address: string; studentId: string };
+const ROLE_COLORS: Record<
+  string,
+  "blue" | "green" | "yellow" | "purple" | "gray"
+> = {
+  SECRETARY: "blue",
+  TEACHER: "green",
+  STUDENT: "yellow",
+  GUARDIAN: "purple",
+  ADMIN_GLOBAL: "gray",
+};
+
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+  active: boolean;
+  createdAt: string;
+};
+type CreateForm = {
+  role: string;
+  name: string;
+  email: string;
+  phone: string;
+  studentId: string;
+};
 type EditForm = { name: string; phone: string };
 
-const emptyCreate = (): CreateForm => ({ role: "", name: "", email: "", phone: "", password: "", cpf: "", birthDate: "", address: "", studentId: "" });
+const emptyCreate = (): CreateForm => ({
+  role: "",
+  name: "",
+  email: "",
+  phone: "",
+  studentId: "",
+});
+
+const LIMIT = 20;
 
 export default function Users() {
   const [items, setItems] = useState<User[]>([]);
@@ -41,301 +88,721 @@ export default function Users() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  // FIX #3: toggle to show inactive users
   const [showInactive, setShowInactive] = useState(false);
-  const [modal, setModal] = useState<"create" | "edit" | "deactivate" | "activate" | "created" | null>(null);
+  const [modal, setModal] = useState<
+    | "create"
+    | "edit"
+    | "deactivate"
+    | "activate"
+    | "created"
+    | "teacherProfile"
+    | "guardianProfile"
+    | null
+  >(null);
   const [selected, setSelected] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate());
   const [editForm, setEditForm] = useState<EditForm>({ name: "", phone: "" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [createdPassword, setCreatedPassword] = useState("");
-  const [createdUser, setCreatedUser] = useState<{ name: string; email: string } | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [createdUser, setCreatedUser] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
+  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
   const [pwCopied, setPwCopied] = useState(false);
-  const LIMIT = 20;
 
-  const load = useCallback(async (p = 1, s = search, r = roleFilter, inactive = showInactive) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
-      if (r) params.set("role", r);
-      // FIX #1: name search now works (backend fixed)
-      if (s) params.set("name", s);
-      // FIX #3: inactive filter
-      if (inactive) params.set("active", "false"); else params.set("active", "true");
-      const res = await api.fetchJson(`/users?${params}`);
-      setItems(res?.data ?? res ?? []);
-      setTotal(res?.meta?.total ?? 0);
-      setPage(p);
-    } catch (e: any) {
-      toast(e?.message || "Erro ao carregar usuários", "error");
-    } finally { setLoading(false); }
-  }, [search, roleFilter, showInactive]);
+  const roleLabel = ROLE_LABELS[createForm.role] ?? createForm.role;
 
-  useEffect(() => { load(1); }, [roleFilter, showInactive]);
+  const load = useCallback(
+    async (p = 1, s = search, r = roleFilter, inactive = showInactive) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(p),
+          limit: String(LIMIT),
+        });
+        if (r) params.set("role", r);
+        if (s) params.set("name", s);
+        if (inactive) params.set("active", "false");
+        else params.set("active", "true");
+        const res = await api.fetchJson(`/users?${params}`);
+        setItems(res?.data ?? []);
+        setTotal(res?.meta?.total ?? 0);
+        setPage(p);
+      } catch (e: any) {
+        toast(e?.message || "Erro ao carregar usuários", "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [search, roleFilter, showInactive],
+  );
 
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); load(1, searchInput, roleFilter, showInactive); }, 400);
+    load(1);
+  }, [roleFilter, showInactive]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      load(1, searchInput, roleFilter, showInactive);
+    }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
 
   useEffect(() => {
     if (modal === "create" && createForm.role === "GUARDIAN") {
-      api.fetchJson("/students?limit=200").then(res => {
-        setStudents((res?.data ?? res ?? []).map((s: any) => ({ id: s.id, name: s.name })));
-      }).catch(() => {});
+      api
+        .fetchJson("/students?limit=200")
+        .then((res) => {
+          setStudents(
+            (res?.data ?? []).map((s: any) => ({ id: s.id, name: s.name })),
+          );
+        })
+        .catch(() => {});
     }
   }, [modal, createForm.role]);
 
-  function setC(patch: Partial<CreateForm>) { setCreateForm(f => ({ ...f, ...patch })); }
+  function setC(patch: Partial<CreateForm>) {
+    setCreateForm((f) => ({ ...f, ...patch }));
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     const f = createForm;
-    if (!f.role) { setFormError("Selecione um perfil."); return; }
-    if (!f.name || (f.role !== "STUDENT" && !f.email)) { setFormError("Nome e e-mail são obrigatórios."); return; }
-    if (f.role === "GUARDIAN" && !f.studentId) { setFormError("Selecione o aluno vinculado."); return; }
-    setSaving(true); setFormError("");
+    if (!f.role) {
+      setFormError("Selecione um perfil.");
+      return;
+    }
+    if (!f.name || !f.email) {
+      setFormError("Nome e e-mail são obrigatórios.");
+      return;
+    }
+    if (f.role === "GUARDIAN" && !f.studentId) {
+      setFormError("Selecione o aluno vinculado.");
+      return;
+    }
+    setSaving(true);
+    setFormError("");
     try {
-      let tempPassword = "", userName = f.name, userEmail = f.email;
+      const res = await api.fetchJson("/users", {
+        method: "POST",
+        body: JSON.stringify({
+          name: f.name,
+          email: f.email,
+          role: f.role,
+          phone: f.phone || undefined,
+        }),
+      });
+      const tempPassword = res?.temporaryPassword ?? "";
 
-      if (f.role === "STUDENT") {
-        const res = await api.fetchJson("/students", {
-          method: "POST",
-          body: JSON.stringify({ name: f.name, email: f.email || undefined, phone: f.phone || undefined, cpf: f.cpf || undefined, birthDate: f.birthDate || undefined, address: f.address || undefined }),
-        });
-        tempPassword = res?.temporaryPassword || "";
-        userName = res?.student?.name || f.name;
-      } else {
-        const res = await api.fetchJson("/users", {
-          method: "POST",
-          body: JSON.stringify({ name: f.name, email: f.email, role: f.role, phone: f.phone || undefined }),
-        });
-        tempPassword = res?.temporaryPassword || "";
-        userName = res?.user?.name || f.name;
-        userEmail = res?.user?.email || f.email;
-
-        // FIX #2: guardian link now goes to real endpoint
-        if (f.role === "GUARDIAN" && f.studentId && res?.user?.id) {
-          try {
-            await api.fetchJson(`/students/${f.studentId}/guardians`, {
-              method: "POST",
-              body: JSON.stringify({ guardianId: res.user.id }),
-            });
-          } catch {
-            toast("Usuário criado mas o vínculo com o aluno falhou. Vincule manualmente.", "error");
-          }
+      if (f.role === "GUARDIAN" && f.studentId && res?.user?.id) {
+        try {
+          await api.fetchJson(`/students/${f.studentId}/guardians`, {
+            method: "POST",
+            body: JSON.stringify({ guardianId: res.user.id }),
+          });
+        } catch {
+          toast(
+            "Usuário criado mas o vínculo com o aluno falhou. Vincule manualmente.",
+            "error",
+          );
         }
       }
 
       setCreatedPassword(tempPassword);
-      setCreatedUser({ name: userName, email: userEmail });
+      setCreatedUser({
+        name: res?.user?.name ?? f.name,
+        email: res?.user?.email ?? f.email,
+      });
       setPwCopied(false);
       setModal("created");
       load(1, searchInput, roleFilter, showInactive);
-    } catch (e: any) { setFormError(e?.message || "Erro ao criar usuário."); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      setFormError(e?.message || "Erro ao criar usuário.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
-    if (!editForm.name) { setFormError("Nome é obrigatório."); return; }
-    setSaving(true); setFormError("");
+    if (!editForm.name) {
+      setFormError("Nome é obrigatório.");
+      return;
+    }
+    setSaving(true);
+    setFormError("");
     try {
       await api.fetchJson(`/users/${selected.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: editForm.name, phone: editForm.phone || undefined }),
+        body: JSON.stringify({
+          name: editForm.name,
+          phone: editForm.phone || undefined,
+        }),
       });
-      toast("Usuário atualizado!"); setModal(null); load(page, searchInput, roleFilter, showInactive);
-    } catch (e: any) { setFormError(e?.message || "Erro ao atualizar."); }
-    finally { setSaving(false); }
+      toast("Usuário atualizado!");
+      setModal(null);
+      load(page, searchInput, roleFilter, showInactive);
+    } catch (e: any) {
+      setFormError(e?.message || "Erro ao atualizar.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDeactivate() {
     if (!selected) return;
     setSaving(true);
     try {
-      await api.fetchJson(`/users/${selected.id}/deactivate`, { method: "PATCH" });
-      toast("Usuário desativado."); setModal(null); load(page, searchInput, roleFilter, showInactive);
-    } catch (e: any) { toast(e?.message || "Erro ao desativar.", "error"); }
-    finally { setSaving(false); }
+      await api.fetchJson(`/users/${selected.id}/deactivate`, {
+        method: "PATCH",
+      });
+      toast("Usuário desativado!");
+      setModal(null);
+      load(page, searchInput, roleFilter, showInactive);
+    } catch (e: any) {
+      toast(e?.message || "Erro ao desativar.", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  // FIX #3: reactivate user
   async function handleActivate() {
     if (!selected) return;
     setSaving(true);
     try {
-      await api.fetchJson(`/users/${selected.id}/activate`, { method: "PATCH" });
-      toast("Usuário reativado!"); setModal(null); load(page, searchInput, roleFilter, showInactive);
-    } catch (e: any) { toast(e?.message || "Erro ao reativar.", "error"); }
-    finally { setSaving(false); }
+      await api.fetchJson(`/users/${selected.id}/activate`, {
+        method: "PATCH",
+      });
+      toast("Usuário reativado!");
+      setModal(null);
+      load(page, searchInput, roleFilter, showInactive);
+    } catch (e: any) {
+      toast(e?.message || "Erro ao reativar.", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const roleLabel = ROLE_LABELS[createForm.role] || "";
-
-  const columns = ["Nome", "E-mail", "Perfil", "Telefone", "Status", "Ações"];
-  const rows = items.map(u => [
-    <span style={{ fontWeight: 600 }}>{u.name}</span>,
-    u.email.includes("@placeholder.internal") ? <span style={{ color: "#9ca3af", fontSize: 12 }}>Sem e-mail</span> : u.email,
-    <StatusBadge label={ROLE_LABELS[u.role] || u.role} color={ROLE_COLORS[u.role] || "gray"} />,
-    u.phone || <span style={{ color: "#d1d5db" }}>—</span>,
-    <StatusBadge label={u.active ? "Ativo" : "Inativo"} color={u.active ? "green" : "red"} />,
-    <div style={{ display: "flex", gap: 4 }}>
-      <IconButton onClick={() => { setEditForm({ name: u.name, phone: u.phone || "" }); setFormError(""); setSelected(u); setModal("edit"); }} title="Editar">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-      </IconButton>
-      {u.active ? (
-        <IconButton onClick={() => { setSelected(u); setModal("deactivate"); }} title="Desativar" variant="danger">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-        </IconButton>
-      ) : (
-        // FIX #3: reactivate button
-        <IconButton onClick={() => { setSelected(u); setModal("activate"); }} title="Reativar">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </IconButton>
-      )}
-    </div>,
-  ]);
+  const columns = [
+    {
+      key: "name",
+      label: "Usuário",
+      render: (row: User) => (
+        <div>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{row.name}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+            {row.email}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      label: "Perfil",
+      render: (row: User) => (
+        <StatusBadge
+          status="active"
+          label={ROLE_LABELS[row.role] ?? row.role}
+          color={ROLE_COLORS[row.role]}
+        />
+      ),
+    },
+    {
+      key: "phone",
+      label: "Telefone",
+      render: (row: User) => (
+        <span style={{ fontSize: 13, color: "#6b7280" }}>
+          {row.phone || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row: User) => (
+        <StatusBadge
+          status={row.active ? "active" : "inactive"}
+          label={row.active ? "Ativo" : "Inativo"}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (row: User) => (
+        <div style={{ display: "flex", gap: 4 }}>
+          {row.role !== "TEACHER" && row.role !== "GUARDIAN" && (
+            <IconButton
+              icon="edit"
+              title="Editar"
+              onClick={() => {
+                setSelected(row);
+                setEditForm({ name: row.name, phone: row.phone ?? "" });
+                setFormError("");
+                setModal("edit");
+              }}
+            />
+          )}
+          {row.role === "TEACHER" && (
+            <IconButton
+              icon="view"
+              title="Perfil profissional"
+              onClick={() => {
+                setSelected(row);
+                setModal("teacherProfile");
+              }}
+            />
+          )}
+          {row.role === "GUARDIAN" && (
+            <IconButton
+              icon="view"
+              title="Dados do responsável"
+              onClick={() => {
+                setSelected(row);
+                setModal("guardianProfile");
+              }}
+            />
+          )}
+          {row.active ? (
+            <IconButton
+              icon="delete"
+              title="Desativar"
+              onClick={() => {
+                setSelected(row);
+                setModal("deactivate");
+              }}
+            />
+          ) : (
+            <IconButton
+              icon="check"
+              title="Reativar"
+              onClick={() => {
+                setSelected(row);
+                setModal("activate");
+              }}
+            />
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <PageShell
       title="Usuários"
-      description="Gerencie professores, alunos e responsáveis da escola."
-      action={<PrimaryButton onClick={() => { setCreateForm(emptyCreate()); setFormError(""); setModal("create"); }}>+ Novo usuário</PrimaryButton>}
+      description="Gerencie professores, responsáveis e secretaria. Para alunos, use o menu Alunos."
+      action={
+        <PrimaryButton
+          onClick={() => {
+            setCreateForm(emptyCreate());
+            setFormError("");
+            setModal("create");
+          }}
+        >
+          + Novo usuário
+        </PrimaryButton>
+      }
     >
       <Card>
-        <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <SearchBar value={searchInput} onChange={setSearchInput} placeholder="Buscar por nome...">
-              <SelectFilter value={roleFilter} onChange={v => setRoleFilter(v)} options={ROLE_FILTER_OPTIONS} placeholder="Todos os perfis" />
-            </SearchBar>
-          </div>
-          {/* FIX #3: toggle inactive */}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6b7280", cursor: "pointer", userSelect: "none" }}>
-            <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            padding: "14px 16px",
+            borderBottom: "1px solid #f1f5f9",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <SearchBar
+            value={searchInput}
+            onChange={setSearchInput}
+            onSearch={() => load(1, searchInput, roleFilter, showInactive)}
+            placeholder="Buscar por nome..."
+          />
+          <SelectFilter
+            value={roleFilter}
+            onChange={(v) => {
+              setRoleFilter(v);
+            }}
+            options={[
+              { value: "", label: "Todos os perfis" },
+              ...ROLE_FILTER_OPTIONS,
+            ]}
+          />
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              color: "#6b7280",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+            />
             Mostrar inativos
           </label>
         </div>
-        <DataTable columns={columns} rows={rows} loading={loading} emptyMessage="Nenhum usuário encontrado." />
-        <Pagination page={page} total={total} limit={LIMIT} onPage={(p) => load(p, searchInput, roleFilter, showInactive)} />
+
+        <DataTable
+          columns={columns}
+          data={items}
+          loading={loading}
+          emptyMessage="Nenhum usuário encontrado"
+        />
+        <Pagination
+          page={page}
+          total={total}
+          limit={LIMIT}
+          onPage={(p) => load(p, searchInput, roleFilter, showInactive)}
+        />
       </Card>
 
       {/* CREATE */}
-      <Modal open={modal === "create"} onClose={() => setModal(null)} title="Novo usuário" width={520}>
+      <Modal
+        open={modal === "create"}
+        onClose={() => setModal(null)}
+        title="Novo usuário"
+        width={500}
+      >
         <form onSubmit={handleCreate}>
-          {formError && <div style={{ marginBottom: 14 }}><InlineAlert message={formError} type="error" /></div>}
+          {formError && (
+            <div style={{ marginBottom: 14 }}>
+              <InlineAlert message={formError} type="error" />
+            </div>
+          )}
           <FormField label="Perfil" required>
-            <Select value={createForm.role} onChange={v => setC({ role: v })} options={ROLE_OPTIONS} placeholder="Selecione o perfil..." />
+            <Select
+              value={createForm.role}
+              onChange={(v) => setC({ role: v })}
+              options={ROLE_OPTIONS}
+              placeholder="Selecione o perfil..."
+            />
           </FormField>
           {createForm.role && (
             <>
-              <div style={{ borderTop: "1px solid #f1f5f9", margin: "14px 0", paddingTop: 14 }}>
-                <p style={{ margin: "0 0 12px", fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  borderTop: "1px solid #f1f5f9",
+                  margin: "14px 0",
+                  paddingTop: 14,
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Dados do {roleLabel}
                 </p>
               </div>
               <FormField label="Nome completo" required>
-                <Input value={createForm.name} onChange={v => setC({ name: v })} placeholder="Ex: Maria Silva" />
+                <Input
+                  value={createForm.name}
+                  onChange={(v) => setC({ name: v })}
+                  placeholder="Ex: Maria Silva"
+                />
               </FormField>
-              <FormField label="E-mail" required={createForm.role !== "STUDENT"}>
-                <Input type="email" value={createForm.email} onChange={v => setC({ email: v })}
-                  placeholder={createForm.role === "STUDENT" ? "Opcional para alunos" : "email@exemplo.com"} />
+              <FormField label="E-mail" required>
+                <Input
+                  type="email"
+                  value={createForm.email}
+                  onChange={(v) => setC({ email: v })}
+                  placeholder="email@exemplo.com"
+                />
               </FormField>
               <FormField label="Telefone">
-                <Input value={createForm.phone} onChange={v => setC({ phone: v })} placeholder="(00) 00000-0000" />
+                <Input
+                  value={createForm.phone}
+                  onChange={(v) => setC({ phone: v })}
+                  placeholder="(00) 00000-0000"
+                />
               </FormField>
-              {createForm.role === "STUDENT" && (
-                <>
-                  <FormField label="CPF"><Input value={createForm.cpf} onChange={v => setC({ cpf: v })} placeholder="000.000.000-00" /></FormField>
-                  <FormField label="Data de nascimento"><input type="date" value={createForm.birthDate} onChange={e => setC({ birthDate: e.target.value })} style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: 9, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }} /></FormField>
-                  <FormField label="Endereço"><Input value={createForm.address} onChange={v => setC({ address: v })} /></FormField>
-                </>
-              )}
               {createForm.role === "GUARDIAN" && (
                 <FormField label="Aluno vinculado" required>
-                  <Select value={createForm.studentId} onChange={v => setC({ studentId: v })}
-                    options={students.map(s => ({ value: s.id, label: s.name }))}
-                    placeholder={students.length === 0 ? "Carregando alunos..." : "Selecione o aluno..."} />
+                  <Select
+                    value={createForm.studentId}
+                    onChange={(v) => setC({ studentId: v })}
+                    options={students.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    }))}
+                    placeholder={
+                      students.length === 0
+                        ? "Carregando alunos..."
+                        : "Selecione o aluno..."
+                    }
+                  />
                 </FormField>
               )}
             </>
           )}
           <ModalFooter>
-            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
-            <PrimaryButton type="submit" loading={saving} disabled={!createForm.role}>Criar usuário</PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setModal(null)}
+              style={{
+                padding: "0 20px",
+                height: 38,
+                borderRadius: 8,
+                border: "1.5px solid #e2e8f0",
+                background: "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Cancelar
+            </button>
+            <PrimaryButton type="submit" disabled={saving}>
+              {saving ? "Criando..." : "Criar usuário"}
+            </PrimaryButton>
           </ModalFooter>
         </form>
       </Modal>
 
-      {/* CREATED — show password */}
-      <Modal open={modal === "created"} onClose={() => setModal(null)} title="Usuário criado com sucesso">
-        <p style={{ margin: "0 0 6px", fontSize: 13, color: "#374151" }}>
-          <strong>{createdUser?.name}</strong> ({createdUser?.email}) foi cadastrado.
-        </p>
-        {createdPassword ? (
-          <>
-            <p style={{ margin: "12px 0 6px", fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>Senha temporária</p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 9, padding: "10px 14px", marginBottom: 12 }}>
-              <code style={{ flex: 1, fontSize: 15, fontWeight: 700, letterSpacing: "0.05em", color: "#1e293b" }}>{createdPassword}</code>
-              <button onClick={() => { navigator.clipboard.writeText(createdPassword); setPwCopied(true); setTimeout(() => setPwCopied(false), 2000); }}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: pwCopied ? "#10b981" : "#6366f1", fontWeight: 600, padding: "4px 8px" }}>
-                {pwCopied ? "Copiado!" : "Copiar"}
-              </button>
-            </div>
-            <InlineAlert message="Anote a senha. Ela não poderá ser visualizada novamente." type="info" />
-          </>
-        ) : (
-          <InlineAlert message="Senha gerada mas não retornada. Redefina se necessário." type="info" />
-        )}
-        <ModalFooter><PrimaryButton onClick={() => setModal(null)}>Concluir</PrimaryButton></ModalFooter>
+      {/* CREATED */}
+      <Modal
+        open={modal === "created"}
+        onClose={() => setModal(null)}
+        title="Usuário criado!"
+        width={400}
+      >
+        <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              background: "#dcfce7",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+            }}
+          >
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#16a34a"
+              strokeWidth="2.5"
+            >
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          {createdUser && (
+            <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 15 }}>
+              {createdUser.name}
+            </p>
+          )}
+          {createdPassword && (
+            <>
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6b7280" }}>
+                Senha temporária:
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <code
+                  style={{
+                    background: "#f1f5f9",
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  {createdPassword}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdPassword);
+                    setPwCopied(true);
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1.5px solid #e2e8f0",
+                    background: pwCopied ? "#dcfce7" : "#fff",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  {pwCopied ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <ModalFooter>
+          <PrimaryButton onClick={() => setModal(null)}>Fechar</PrimaryButton>
+        </ModalFooter>
       </Modal>
 
       {/* EDIT */}
-      <Modal open={modal === "edit"} onClose={() => setModal(null)} title="Editar usuário">
+      <Modal
+        open={modal === "edit"}
+        onClose={() => setModal(null)}
+        title="Editar usuário"
+        width={440}
+      >
         <form onSubmit={handleEdit}>
-          {formError && <div style={{ marginBottom: 14 }}><InlineAlert message={formError} type="error" /></div>}
-          <FormField label="Nome completo" required><Input value={editForm.name} onChange={v => setEditForm(f => ({ ...f, name: v }))} /></FormField>
-          <FormField label="E-mail"><Input value={selected?.email?.includes("@placeholder.internal") ? "" : selected?.email || ""} onChange={() => {}} disabled /></FormField>
-          <FormField label="Perfil"><Input value={ROLE_LABELS[selected?.role || ""] || ""} onChange={() => {}} disabled /></FormField>
-          <FormField label="Telefone"><Input value={editForm.phone} onChange={v => setEditForm(f => ({ ...f, phone: v }))} placeholder="(00) 00000-0000" /></FormField>
+          {formError && (
+            <div style={{ marginBottom: 14 }}>
+              <InlineAlert message={formError} type="error" />
+            </div>
+          )}
+          <FormField label="Nome completo" required>
+            <Input
+              value={editForm.name}
+              onChange={(v) => setEditForm((f) => ({ ...f, name: v }))}
+            />
+          </FormField>
+          <FormField label="Telefone">
+            <Input
+              value={editForm.phone}
+              onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))}
+              placeholder="(00) 00000-0000"
+            />
+          </FormField>
           <ModalFooter>
-            <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
-            <PrimaryButton type="submit" loading={saving}>Salvar alterações</PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setModal(null)}
+              style={{
+                padding: "0 20px",
+                height: 38,
+                borderRadius: 8,
+                border: "1.5px solid #e2e8f0",
+                background: "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Cancelar
+            </button>
+            <PrimaryButton type="submit" disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </PrimaryButton>
           </ModalFooter>
         </form>
       </Modal>
 
       {/* DEACTIVATE */}
-      <Modal open={modal === "deactivate"} onClose={() => setModal(null)} title="Desativar usuário">
-        <p style={{ margin: "0 0 16px", color: "#374151", fontSize: 14 }}>
-          Desativar <strong>{selected?.name}</strong>? O usuário perderá acesso imediatamente.
+      <Modal
+        open={modal === "deactivate"}
+        onClose={() => setModal(null)}
+        title="Desativar usuário"
+        width={400}
+      >
+        <p style={{ margin: "0 0 20px", fontSize: 14, color: "#374151" }}>
+          Desativar <strong>{selected?.name}</strong>? O usuário perderá acesso
+          ao sistema.
         </p>
         <ModalFooter>
-          <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
-          <PrimaryButton variant="danger" onClick={handleDeactivate} loading={saving}>Desativar</PrimaryButton>
+          <button
+            onClick={() => setModal(null)}
+            style={{
+              padding: "0 20px",
+              height: 38,
+              borderRadius: 8,
+              border: "1.5px solid #e2e8f0",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleDeactivate}
+            disabled={saving}
+            style={{
+              padding: "0 20px",
+              height: 38,
+              borderRadius: 8,
+              border: "none",
+              background: "#ef4444",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {saving ? "Desativando..." : "Desativar"}
+          </button>
         </ModalFooter>
       </Modal>
 
-      {/* ACTIVATE (FIX #3) */}
-      <Modal open={modal === "activate"} onClose={() => setModal(null)} title="Reativar usuário">
-        <p style={{ margin: "0 0 16px", color: "#374151", fontSize: 14 }}>
-          Reativar <strong>{selected?.name}</strong>? O usuário poderá acessar o sistema novamente.
+      {/* ACTIVATE */}
+      <Modal
+        open={modal === "activate"}
+        onClose={() => setModal(null)}
+        title="Reativar usuário"
+        width={400}
+      >
+        <p style={{ margin: "0 0 20px", fontSize: 14, color: "#374151" }}>
+          Reativar <strong>{selected?.name}</strong> e restaurar o acesso?
         </p>
         <ModalFooter>
-          <PrimaryButton variant="ghost" onClick={() => setModal(null)}>Cancelar</PrimaryButton>
-          <PrimaryButton onClick={handleActivate} loading={saving}>Reativar</PrimaryButton>
+          <button
+            onClick={() => setModal(null)}
+            style={{
+              padding: "0 20px",
+              height: 38,
+              borderRadius: 8,
+              border: "1.5px solid #e2e8f0",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Cancelar
+          </button>
+          <PrimaryButton onClick={handleActivate} disabled={saving}>
+            {saving ? "Reativando..." : "Reativar"}
+          </PrimaryButton>
         </ModalFooter>
       </Modal>
+
+      {/* TEACHER PROFILE */}
+      {modal === "teacherProfile" && selected && (
+        <TeacherProfileModal
+          userId={selected.id}
+          userName={selected.name}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {/* GUARDIAN PROFILE */}
+      {modal === "guardianProfile" && selected && (
+        <GuardianProfileModal
+          userId={selected.id}
+          userName={selected.name}
+          onClose={() => setModal(null)}
+        />
+      )}
     </PageShell>
   );
 }

@@ -160,7 +160,7 @@ async function main() {
     data: {
       schoolId: school.id,
       name: "Pedro Aluno",
-      cpf: "111.111.111-11",
+cpf: "111.111.111-11",
       birthDate: new Date("2008-05-10"),
       email: "aluno.pedro@saojose.com",
       userId: studentUser1.id,
@@ -181,7 +181,7 @@ async function main() {
     data: {
       schoolId: school.id,
       name: "Júlia Aluna",
-      cpf: "222.222.222-22",
+cpf: "222.222.222-22",
       birthDate: new Date("2008-09-20"),
       email: "aluna.julia@saojose.com",
       userId: studentUser2.id,
@@ -203,7 +203,7 @@ async function main() {
     data: {
       schoolId: school.id,
       name: "Lucas Outro Aluno",
-      cpf: "333.333.333-33",
+cpf: "333.333.333-33",
       birthDate: new Date("2007-03-15"),
       userId: studentUser3.id,
     },
@@ -509,8 +509,8 @@ async function main() {
       assessmentId: assessment1.id,
       enrollmentId: enrollment1.id,
       score: 8.5,
-      recordedById: teacher1.id,
-      status: "lancada",
+      launchedById: teacher1.id,
+      launchedAt: new Date(),
     },
   });
 
@@ -520,8 +520,8 @@ async function main() {
       assessmentId: assessment1.id,
       enrollmentId: enrollment2.id,
       score: 7.0,
-      recordedById: teacher1.id,
-      status: "lancada",
+      launchedById: teacher1.id,
+      launchedAt: new Date(),
     },
   });
 
@@ -531,8 +531,8 @@ async function main() {
       assessmentId: assessment2.id,
       enrollmentId: enrollment1.id,
       score: 9.0,
-      recordedById: teacher1.id,
-      status: "lancada",
+      launchedById: teacher1.id,
+      launchedAt: new Date(),
     },
   });
 
@@ -542,8 +542,8 @@ async function main() {
       assessmentId: assessment3.id,
       enrollmentId: enrollment3.id,
       score: 6.5,
-      recordedById: teacher2.id,
-      status: "lancada",
+      launchedById: teacher2.id,
+      launchedAt: new Date(),
     },
   });
 
@@ -551,9 +551,9 @@ async function main() {
   await prisma.gradeAudit.create({
     data: {
       schoolId: school.id,
-      studentGradeId: grade1.id,
-      oldValue: 7.5,
-      newValue: 8.5,
+      gradeId: grade1.id,
+      oldScore: 7.5,
+      newScore: 8.5,
       changedById: teacher1.id,
     },
   });
@@ -569,9 +569,8 @@ async function main() {
       classroomId: classroom1.id,
       subjectId: subjectMath.id,
       createdById: teacher1.id,
-      sessionDate: new Date("2025-04-08"),
-      startTime: new Date("1970-01-01T08:00:00.000Z"),
-      endTime: new Date("1970-01-01T09:00:00.000Z"),
+      date: new Date("2025-04-08"),
+      totalSlots: 1,
       notes: "Aula de álgebra",
     },
   });
@@ -582,13 +581,13 @@ async function main() {
         schoolId: school.id,
         sessionId: session.id,
         enrollmentId: enrollment1.id,
-        status: "presente",
+        present: true,
       },
       {
         schoolId: school.id,
         sessionId: session.id,
         enrollmentId: enrollment2.id,
-        status: "falta",
+        present: false,
       },
     ],
   });

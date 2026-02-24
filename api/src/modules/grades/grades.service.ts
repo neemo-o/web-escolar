@@ -22,7 +22,7 @@ export function findGrades(
     where,
     skip,
     take,
-    orderBy: { recordedAt: "desc" },
+    orderBy: { launchedAt: "desc" },
   });
 }
 
@@ -55,7 +55,7 @@ export async function createOrUpdateGrade(
   });
   if (!existing) {
     return prisma.studentGrade.create({
-      data: { ...data, recordedById: changedById, score },
+      data: { ...data, launchedById: changedById, launchedAt: new Date(), score },
     });
   }
 
@@ -63,16 +63,16 @@ export async function createOrUpdateGrade(
     await tx.gradeAudit.create({
       data: {
         schoolId: data.schoolId,
-        studentGradeId: existing.id,
-        oldValue: existing.score ?? 0,
-        newValue: score ?? 0,
+        gradeId: existing.id,
+        oldScore: existing.score ?? 0,
+        newScore: score ?? 0,
         changedById,
       },
     });
 
     return tx.studentGrade.update({
       where: { id: existing.id },
-      data: { score, recordedById: changedById },
+      data: { score, launchedById: changedById, launchedAt: new Date() },
     });
   });
 

@@ -11,6 +11,7 @@ export const ROUTE_ROLES: Record<string, string[]> = {
 
   // secretary
   users: ["SECRETARY"],
+  students: ["SECRETARY"],
   classrooms: ["SECRETARY"],
   enrollments: ["SECRETARY"],
   "grades-view": ["SECRETARY"],

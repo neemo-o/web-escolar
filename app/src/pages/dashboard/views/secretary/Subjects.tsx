@@ -93,7 +93,12 @@ export default function Subjects() {
     setFormError(""); setSelected(item); setModal("edit");
   }
 
-  const columns = ["Nome", "Código", "Descrição", "Ações"];
+  const columns = [
+    { key: "name", label: "Nome" },
+    { key: "code", label: "Código" },
+    { key: "description", label: "Descrição" },
+    { key: "actions", label: "Ações" },
+  ];
   const rows = items.map(item => [
     <span style={{ fontWeight: 600 }}>{item.name}</span>,
     <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>{item.code}</code>,

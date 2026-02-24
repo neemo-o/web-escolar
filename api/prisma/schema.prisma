@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -62,6 +61,56 @@ enum Shift {
   INTEGRAL
 }
 
+enum Gender {
+  MASCULINO
+  FEMININO
+  OUTRO
+  NAO_INFORMADO
+}
+
+enum StudentStatus {
+  ATIVO
+  TRANSFERIDO
+  TRANCADO
+  CONCLUIDO
+  CANCELADO
+}
+
+enum TeacherStatus {
+  ATIVO
+  AFASTADO
+  DESLIGADO
+}
+
+enum GuardianRelationType {
+  PAI
+  MAE
+  TUTOR_LEGAL
+  OUTRO
+}
+
+enum DocumentType {
+  RG
+  CPF
+  CERTIDAO_NASCIMENTO
+  COMPROVANTE_RESIDENCIA
+  HISTORICO_ESCOLAR
+  LAUDO_MEDICO
+  FOTO
+  OUTRO
+}
+
+enum MovementType {
+  MATRICULA
+  TRANSFERENCIA_TURMA
+  TRANSFERENCIA_SERIE
+  TRANCAMENTO
+  REATIVACAO
+  CONCLUSAO
+  CANCELAMENTO
+  OUTRO
+}
+
 // =============================================================================
 // TENANT
 // =============================================================================
@@ -89,6 +138,7 @@ model School {
   schoolEvents       SchoolEvent[]
   studentGuardians   StudentGuardian[]
   users              User[]
+  enrollments        Enrollment[]
 
   @@map("schools")
 }
@@ -105,23 +155,23 @@ model SchoolConfig {
   logoUrl        String?
   displayName    String? @db.VarChar(200)
 
-  periodType     String  @default("bimestre") @db.VarChar(20)
-  periodsPerYear Int     @default(4)
-  passingGrade   Decimal @default(60.0) @db.Decimal(5, 2)
-  gradeScale     Decimal @default(100.0) @db.Decimal(5, 2)
+  periodType     String   @default("bimestre") @db.VarChar(20)
+  periodsPerYear Int      @default(4)
+  passingGrade   Decimal  @default(60.0) @db.Decimal(5, 2)
+  gradeScale     Decimal  @default(100.0) @db.Decimal(5, 2)
   recoveryGrade  Decimal? @db.Decimal(5, 2)
-  decimalPlaces  Int     @default(1)
+  decimalPlaces  Int      @default(1)
 
   minAttendancePct    Decimal @default(75.0) @db.Decimal(5, 2)
   countAbsenceType    String  @default("por_aula") @db.VarChar(20)
   justifyAbsenceLimit Int     @default(10)
 
-  allowGradeEditAfterClose  Boolean @default(false)
-  allowLateEnrollment       Boolean @default(false)
-  requireGuardianApproval   Boolean @default(false)
-  notifyGradeLaunch         Boolean @default(true)
-  notifyAbsence             Boolean @default(true)
-  notifyFrequencyThreshold  Decimal @default(80.0) @db.Decimal(5, 2)
+  allowGradeEditAfterClose Boolean @default(false)
+  allowLateEnrollment      Boolean @default(false)
+  requireGuardianApproval  Boolean @default(false)
+  notifyGradeLaunch        Boolean @default(true)
+  notifyAbsence            Boolean @default(true)
+  notifyFrequencyThreshold Decimal @default(80.0) @db.Decimal(5, 2)
 
   directorName  String? @db.VarChar(200)
   directorTitle String? @default("Diretor(a)") @db.VarChar(100)
@@ -152,20 +202,86 @@ model User {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  school               School?              @relation(fields: [schoolId], references: [id])
-  studentProfile       Student?             @relation("StudentUser")
-  classroomTeachings   ClassroomTeacher[]   @relation("TeacherInClassroom")
-  gradeLaunches        StudentGrade[]       @relation("GradeLaunchedBy")
-  attendanceSessions   AttendanceSession[]  @relation("SessionCreatedBy")
-  activitiesCreated    Activity[]           @relation("ActivityCreatedBy")
-  assessmentsCreated   Assessment[]         @relation("AssessmentCreatedBy")
-  submissionFeedbacks  ActivitySubmission[] @relation("FeedbackBy")
-  guardianStudents     StudentGuardian[]    @relation("GuardianUser")
-  gradeAudits          GradeAudit[]         @relation("GradeAuditChangedBy")
+  school              School?              @relation(fields: [schoolId], references: [id])
+  studentProfile      Student?             @relation("StudentUser")
+  teacherProfile      TeacherProfile?      @relation("TeacherUser")
+  guardianProfile     GuardianProfile?     @relation("GuardianUser")
+  classroomTeachings  ClassroomTeacher[]   @relation("TeacherInClassroom")
+  gradeLaunches       StudentGrade[]       @relation("GradeLaunchedBy")
+  attendanceSessions  AttendanceSession[]  @relation("SessionCreatedBy")
+  activitiesCreated   Activity[]           @relation("ActivityCreatedBy")
+  assessmentsCreated  Assessment[]         @relation("AssessmentCreatedBy")
+  submissionFeedbacks ActivitySubmission[] @relation("FeedbackBy")
+  guardianStudents    StudentGuardian[]    @relation("GuardianUser")
+  gradeAudits         GradeAudit[]         @relation("GradeAuditChangedBy")
+  enrollmentHistories EnrollmentHistory[]  @relation("MovementCreatedBy")
 
   @@unique([schoolId, email])
   @@index([schoolId])
   @@map("users")
+}
+
+// =============================================================================
+// PERFIS ESTENDIDOS
+// =============================================================================
+
+model TeacherProfile {
+  id             String        @id @default(uuid()) @db.Uuid
+  schoolId       String        @db.Uuid
+  userId         String        @unique @db.Uuid
+  internalCode   String?       @db.VarChar(30)
+  cpf            String?       @db.VarChar(20)
+  rg             String?       @db.VarChar(20)
+  birthDate      DateTime?     @db.Date
+  gender         Gender?
+  nationality    String?       @db.VarChar(100)
+  formation      String?       @db.VarChar(200)
+  specialization String?       @db.VarChar(200)
+  workloadHours  Int?
+  admissionDate  DateTime?     @db.Date
+  status         TeacherStatus @default(ATIVO)
+  zipCode        String?       @db.VarChar(9)
+  street         String?       @db.VarChar(200)
+  addressNumber  String?       @db.VarChar(20)
+  neighborhood   String?       @db.VarChar(100)
+  city           String?       @db.VarChar(100)
+  state          String?       @db.VarChar(2)
+  canGrade       Boolean       @default(true)
+  canAttendance  Boolean       @default(true)
+  canEditContent Boolean       @default(true)
+  canViewReports Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user User @relation("TeacherUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("teacher_profiles")
+}
+
+model GuardianProfile {
+  id             String    @id @default(uuid()) @db.Uuid
+  schoolId       String    @db.Uuid
+  userId         String    @unique @db.Uuid
+  cpf            String?    @db.VarChar(20)
+  rg             String?   @db.VarChar(20)
+  birthDate      DateTime? @db.Date
+  maritalStatus  String?   @db.VarChar(50)
+  profession     String?   @db.VarChar(100)
+  phoneSecondary String?   @db.VarChar(20)
+  zipCode        String?   @db.VarChar(9)
+  street         String?   @db.VarChar(200)
+  addressNumber  String?   @db.VarChar(20)
+  neighborhood   String?   @db.VarChar(100)
+  city           String?   @db.VarChar(100)
+  state          String?   @db.VarChar(2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation("GuardianUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("guardian_profiles")
 }
 
 // =============================================================================
@@ -183,7 +299,7 @@ model AcademicYear {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  school      School      @relation(fields: [schoolId], references: [id])
+  school      School       @relation(fields: [schoolId], references: [id])
   periods     Period[]
   classrooms  Classroom[]
   enrollments Enrollment[]
@@ -216,14 +332,14 @@ model Period {
 }
 
 model GradeLevel {
-  id          String   @id @default(uuid()) @db.Uuid
-  schoolId    String   @db.Uuid
-  name        String   @db.VarChar(100)
-  code        String   @db.VarChar(20)
-  description String?  @db.VarChar(255)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String    @id @default(uuid()) @db.Uuid
+  schoolId    String    @db.Uuid
+  name        String    @db.VarChar(100)
+  code        String    @db.VarChar(20)
+  description String?   @db.VarChar(255)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   school     School      @relation(fields: [schoolId], references: [id])
@@ -267,9 +383,9 @@ model Classroom {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  school             School             @relation(fields: [schoolId], references: [id])
-  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id])
-  gradeLevel         GradeLevel         @relation(fields: [gradeLevelId], references: [id])
+  school             School              @relation(fields: [schoolId], references: [id])
+  academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
+  gradeLevel         GradeLevel          @relation(fields: [gradeLevelId], references: [id])
   classroomSubjects  ClassroomSubject[]
   classroomTeachers  ClassroomTeacher[]
   schedules          Schedule[]
@@ -348,24 +464,40 @@ model Schedule {
 // =============================================================================
 
 model Student {
-  id        String    @id @default(uuid()) @db.Uuid
-  schoolId  String    @db.Uuid
-  name      String    @db.VarChar(200)
-  cpf       String?   @db.VarChar(14)
-  birthDate DateTime? @db.Date
-  email     String?   @db.VarChar(255)
-  phone     String?   @db.VarChar(20)
-  address   String?   @db.VarChar(500)
-  avatarUrl String?
-  userId    String?   @unique @db.Uuid
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id               String        @id @default(uuid()) @db.Uuid
+  schoolId         String        @db.Uuid
+  name             String        @db.VarChar(200)
+  socialName       String?       @db.VarChar(200)
+  cpf              String?        @db.VarChar(20)
+  rg               String?       @db.VarChar(20)
+  birthCertificate String?       @db.VarChar(50)
+  birthDate        DateTime?     @db.Date
+  gender           Gender?
+  nationality      String?       @db.VarChar(100)
+  naturalidade     String?       @db.VarChar(100)
+  email            String?       @db.VarChar(255)
+  phone            String?       @db.VarChar(20)
+  zipCode          String?       @db.VarChar(9)
+  street           String?       @db.VarChar(200)
+  addressNumber    String?       @db.VarChar(20)
+  neighborhood     String?       @db.VarChar(100)
+  city             String?       @db.VarChar(100)
+  state            String?       @db.VarChar(2)
+  avatarUrl        String?
+  status           StudentStatus @default(ATIVO)
+  exitDate         DateTime?     @db.Date
+  userId           String?       @unique @db.Uuid
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
 
-  school      School            @relation(fields: [schoolId], references: [id])
-  user        User?             @relation("StudentUser", fields: [userId], references: [id])
-  guardians   StudentGuardian[]
-  enrollments Enrollment[]
+  school          School              @relation(fields: [schoolId], references: [id])
+  user            User?               @relation("StudentUser", fields: [userId], references: [id])
+  guardians       StudentGuardian[]
+  enrollments     Enrollment[]
+  health          StudentHealth?
+  documents       StudentDocument[]
+  movementHistory EnrollmentHistory[]
 
   @@unique([schoolId, cpf])
   @@index([schoolId])
@@ -373,12 +505,54 @@ model Student {
   @@map("students")
 }
 
+model StudentHealth {
+  id                  String   @id @default(uuid()) @db.Uuid
+  schoolId            String   @db.Uuid
+  studentId           String   @unique @db.Uuid
+  allergies           String?
+  dietaryRestrictions String?
+  specialNeeds        String?
+  medication          String?
+  bloodType           String?  @db.VarChar(5)
+  healthNotes         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, studentId])
+  @@map("student_health")
+}
+
+model StudentDocument {
+  id        String       @id @default(uuid()) @db.Uuid
+  schoolId  String       @db.Uuid
+  studentId String       @db.Uuid
+  type      DocumentType
+  name      String       @db.VarChar(200)
+  fileUrl   String?
+  delivered Boolean      @default(false)
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, studentId])
+  @@map("student_documents")
+}
+
 model StudentGuardian {
-  id         String   @id @default(uuid()) @db.Uuid
-  schoolId   String   @db.Uuid
-  studentId  String   @db.Uuid
-  guardianId String   @db.Uuid
-  createdAt  DateTime @default(now())
+  id                     String               @id @default(uuid()) @db.Uuid
+  schoolId               String               @db.Uuid
+  studentId              String               @db.Uuid
+  guardianId             String               @db.Uuid
+  relationType           GuardianRelationType @default(OUTRO)
+  isFinancialResponsible Boolean              @default(false)
+  canPickUp              Boolean              @default(true)
+  notes                  String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -398,10 +572,12 @@ model Enrollment {
   enrollmentNumber String           @db.VarChar(20)
   status           EnrollmentStatus @default(ATIVA)
   enrolledAt       DateTime         @db.Date
+  exitDate         DateTime?        @db.Date
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
 
+  school              School               @relation(fields: [schoolId], references: [id])
   student             Student              @relation(fields: [studentId], references: [id])
   classroom           Classroom            @relation(fields: [classroomId], references: [id])
   academicYear        AcademicYear         @relation(fields: [academicYearId], references: [id])
@@ -410,6 +586,7 @@ model Enrollment {
   finalGrades         FinalGrade[]
   attendanceRecords   AttendanceRecord[]
   activitySubmissions ActivitySubmission[]
+  history             EnrollmentHistory[]
 
   @@unique([schoolId, enrollmentNumber])
   @@unique([schoolId, studentId, academicYearId])
@@ -419,7 +596,26 @@ model Enrollment {
   @@map("enrollments")
 }
 
-// Counter for generating sequential enrollment numbers per school and year
+model EnrollmentHistory {
+  id           String       @id @default(uuid()) @db.Uuid
+  schoolId     String       @db.Uuid
+  studentId    String       @db.Uuid
+  enrollmentId String?      @db.Uuid
+  type         MovementType
+  description  String?
+  fromValue    String?      @db.VarChar(200)
+  toValue      String?      @db.VarChar(200)
+  createdById  String?      @db.Uuid
+  createdAt    DateTime     @default(now())
+
+  student    Student     @relation(fields: [studentId], references: [id])
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id])
+  createdBy  User?       @relation("MovementCreatedBy", fields: [createdById], references: [id])
+
+  @@index([schoolId, studentId])
+  @@map("enrollment_history")
+}
+
 model EnrollmentCounter {
   id         String   @id @default(uuid()) @db.Uuid
   schoolId   String   @db.Uuid
@@ -468,20 +664,21 @@ model Assessment {
 }
 
 model StudentGrade {
-  id           String   @id @default(uuid()) @db.Uuid
-  schoolId     String   @db.Uuid
-  assessmentId String   @db.Uuid
-  enrollmentId String   @db.Uuid
-  score        Decimal? @db.Decimal(5, 2)
-  status       String   @default("lancada") @db.VarChar(30)
-  recordedById String   @db.Uuid
-  recordedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String    @id @default(uuid()) @db.Uuid
+  schoolId     String    @db.Uuid
+  assessmentId String    @db.Uuid
+  enrollmentId String    @db.Uuid
+  score        Decimal?  @db.Decimal(5, 2)
+  launchedById String?   @db.Uuid
+  launchedAt   DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  assessment  Assessment   @relation(fields: [assessmentId], references: [id])
-  enrollment  Enrollment   @relation(fields: [enrollmentId], references: [id])
-  recordedBy  User         @relation("GradeLaunchedBy", fields: [recordedById], references: [id])
-  gradeAudits GradeAudit[]
+  assessment Assessment   @relation(fields: [assessmentId], references: [id])
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id])
+  launchedBy User?        @relation("GradeLaunchedBy", fields: [launchedById], references: [id])
+  audits     GradeAudit[]
 
   @@unique([assessmentId, enrollmentId])
   @@index([schoolId, assessmentId])
@@ -490,55 +687,52 @@ model StudentGrade {
 }
 
 model GradeAudit {
-  id             String   @id @default(uuid()) @db.Uuid
-  schoolId       String   @db.Uuid
-  studentGradeId String   @db.Uuid
-  oldValue       Decimal  @db.Decimal(5, 2)
-  newValue       Decimal  @db.Decimal(5, 2)
-  changedById    String   @db.Uuid
-  changedAt      DateTime @default(now())
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  gradeId     String   @db.Uuid
+  changedById String   @db.Uuid
+  oldScore    Decimal? @db.Decimal(5, 2)
+  newScore    Decimal? @db.Decimal(5, 2)
+  reason      String?
+  changedAt   DateTime @default(now())
 
-  studentGrade StudentGrade @relation(fields: [studentGradeId], references: [id], onDelete: Cascade)
-  changedBy    User         @relation("GradeAuditChangedBy", fields: [changedById], references: [id])
+  grade     StudentGrade @relation(fields: [gradeId], references: [id])
+  changedBy User         @relation("GradeAuditChangedBy", fields: [changedById], references: [id])
 
-  @@index([schoolId])
-  @@index([studentGradeId])
+  @@index([schoolId, gradeId])
   @@map("grade_audits")
 }
 
 model PeriodGrade {
   id           String   @id @default(uuid()) @db.Uuid
   schoolId     String   @db.Uuid
-  enrollmentId String   @db.Uuid
   periodId     String   @db.Uuid
-  subjectId    String   @db.Uuid
-  grade        Decimal  @db.Decimal(5, 2)
-  absences     Int      @default(0)
-  calculatedAt DateTime @default(now())
+  enrollmentId String   @db.Uuid
+  average      Decimal  @db.Decimal(5, 2)
+  passed       Boolean
+  createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
   period     Period     @relation(fields: [periodId], references: [id])
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
 
-  @@unique([schoolId, enrollmentId, periodId, subjectId])
+  @@unique([periodId, enrollmentId])
   @@index([schoolId, enrollmentId])
   @@map("period_grades")
 }
 
 model FinalGrade {
-  id            String   @id @default(uuid()) @db.Uuid
-  schoolId      String   @db.Uuid
-  enrollmentId  String   @db.Uuid
-  subjectId     String   @db.Uuid
-  finalGrade    Decimal  @db.Decimal(5, 2)
-  totalAbsences Int      @default(0)
-  result        String   @db.VarChar(30)
-  calculatedAt  DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  enrollmentId String   @db.Uuid
+  average      Decimal  @db.Decimal(5, 2)
+  passed       Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
 
-  @@unique([enrollmentId, subjectId])
+  @@unique([enrollmentId])
   @@index([schoolId, enrollmentId])
   @@map("final_grades")
 }
@@ -551,41 +745,40 @@ model AttendanceSession {
   id          String   @id @default(uuid()) @db.Uuid
   schoolId    String   @db.Uuid
   classroomId String   @db.Uuid
-  subjectId   String   @db.Uuid
+  subjectId   String?  @db.Uuid
   createdById String   @db.Uuid
-  sessionDate DateTime @db.Date
-  startTime   DateTime @db.Time()
-  endTime     DateTime @db.Time()
+  date        DateTime @db.Date
+  totalSlots  Int      @default(1)
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
 
   school    School             @relation(fields: [schoolId], references: [id])
   classroom Classroom          @relation(fields: [classroomId], references: [id])
   createdBy User               @relation("SessionCreatedBy", fields: [createdById], references: [id])
   records   AttendanceRecord[]
 
-  @@unique([schoolId, classroomId, subjectId, sessionDate, startTime])
-  @@index([schoolId, classroomId, sessionDate])
+  @@index([schoolId, classroomId, date])
   @@map("attendance_sessions")
 }
 
 model AttendanceRecord {
-  id            String   @id @default(uuid()) @db.Uuid
-  schoolId      String   @db.Uuid
-  sessionId     String   @db.Uuid
-  enrollmentId  String   @db.Uuid
-  status        String   @db.VarChar(20)
-  justification String?
-  createdAt     DateTime @default(now())
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  sessionId    String   @db.Uuid
+  enrollmentId String   @db.Uuid
+  present      Boolean  @default(false)
+  justified    Boolean  @default(false)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   session    AttendanceSession @relation(fields: [sessionId], references: [id])
   enrollment Enrollment        @relation(fields: [enrollmentId], references: [id])
 
   @@unique([sessionId, enrollmentId])
-  @@index([schoolId, enrollmentId])
   @@index([schoolId, sessionId])
+  @@index([schoolId, enrollmentId])
   @@map("attendance_records")
 }
 
@@ -601,7 +794,7 @@ model Activity {
   title       String         @db.VarChar(200)
   description String?
   status      ActivityStatus @default(RASCUNHO)
-  dueDate     DateTime?
+  dueDate     DateTime?      @db.Date
   maxScore    Decimal?       @db.Decimal(5, 2)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -612,8 +805,7 @@ model Activity {
   createdBy   User                 @relation("ActivityCreatedBy", fields: [createdById], references: [id])
   submissions ActivitySubmission[]
 
-  @@index([schoolId, classroomId, status])
-  @@index([schoolId, classroomId, dueDate])
+  @@index([schoolId, classroomId])
   @@map("activities")
 }
 
@@ -622,13 +814,12 @@ model ActivitySubmission {
   schoolId     String    @db.Uuid
   activityId   String    @db.Uuid
   enrollmentId String    @db.Uuid
-  content      String?
-  fileUrl      String?
+  submittedAt  DateTime?
   score        Decimal?  @db.Decimal(5, 2)
-  feedback     String?
   feedbackById String?   @db.Uuid
-  submittedAt  DateTime  @default(now())
-  reviewedAt   DateTime?
+  feedback     String?
+  fileUrl      String?
+  createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   activity   Activity   @relation(fields: [activityId], references: [id])
@@ -637,25 +828,25 @@ model ActivitySubmission {
 
   @@unique([activityId, enrollmentId])
   @@index([schoolId, activityId])
-  @@index([schoolId, enrollmentId])
   @@map("activity_submissions")
 }
 
 // =============================================================================
-// COMUNICAÇÃO (MVP)
+// COMUNICAÇÃO
 // =============================================================================
 
 model Announcement {
-  id        String   @id @default(uuid()) @db.Uuid
-  schoolId  String   @db.Uuid
-  title     String   @db.VarChar(200)
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid()) @db.Uuid
+  schoolId   String   @db.Uuid
+  title      String   @db.VarChar(200)
+  body       String
+  targetRole Role?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   school School @relation(fields: [schoolId], references: [id])
 
-  @@index([schoolId, createdAt])
+  @@index([schoolId])
   @@map("announcements")
 }
 
@@ -666,12 +857,11 @@ model SchoolEvent {
   description String?
   startDate   DateTime
   endDate     DateTime?
-  location    String?   @db.VarChar(255)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   school School @relation(fields: [schoolId], references: [id])
 
-  @@index([schoolId, startDate])
+  @@index([schoolId])
   @@map("school_events")
 }
