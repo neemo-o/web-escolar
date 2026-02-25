@@ -73,14 +73,21 @@ export default function AcademicYears() {
 
   async function handleCreateYear(e: React.FormEvent) {
     e.preventDefault();
+    const yearNum = Number(yearForm.year);
     if (!yearForm.year || !yearForm.startDate || !yearForm.endDate) {
       setFormError("Todos os campos são obrigatórios."); return;
+    }
+    if (yearNum <= 0 || isNaN(yearNum)) {
+      setFormError("Ano deve ser maior que 0."); return;
+    }
+    if (yearForm.endDate < yearForm.startDate) {
+      setFormError("Data de término deve ser posterior à data de início."); return;
     }
     setSaving(true); setFormError("");
     try {
       await api.fetchJson("/academic-years", {
         method: "POST",
-        body: JSON.stringify({ year: Number(yearForm.year), startDate: yearForm.startDate, endDate: yearForm.endDate }),
+        body: JSON.stringify({ year: yearNum, startDate: yearForm.startDate, endDate: yearForm.endDate }),
       });
       toast("Ano letivo criado!"); setModal(null); load(1);
     } catch (e: any) { setFormError(e?.message || "Erro ao criar."); }

@@ -1,7 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
 import { useAuth } from "../../../../contexts/AuthContext";
-import { cleanPhone, formatBrPhone, isValidBrPhone } from "../../../../utils/phone";
+import {
+  cleanPhone,
+  formatBrPhone,
+  isValidBrPhone,
+} from "../../../../utils/phone";
 import {
   PageShell,
   Card,
@@ -70,7 +74,7 @@ type CreateForm = {
   phone: string;
   studentId: string;
 };
-type EditForm = { name: string; phone: string };
+type EditForm = { name: string; email: string; phone: string };
 
 const emptyCreate = (): CreateForm => ({
   role: "",
@@ -115,7 +119,11 @@ export default function Users() {
   >(null);
   const [selected, setSelected] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate());
-  const [editForm, setEditForm] = useState<EditForm>({ name: "", phone: "" });
+  const [editForm, setEditForm] = useState<EditForm>({
+    name: "",
+    email: "",
+    phone: "",
+  });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [createdPassword, setCreatedPassword] = useState("");
@@ -257,6 +265,10 @@ export default function Users() {
       setFormError("Nome é obrigatório.");
       return;
     }
+    if (!editForm.email) {
+      setFormError("E-mail é obrigatório.");
+      return;
+    }
     const phoneDigits = cleanPhone(editForm.phone);
     const phoneRequired =
       selected.role === "TEACHER" || selected.role === "GUARDIAN";
@@ -275,6 +287,7 @@ export default function Users() {
         method: "PATCH",
         body: JSON.stringify({
           name: editForm.name,
+          email: editForm.email,
           phone: phoneDigits || undefined,
         }),
       });
@@ -376,7 +389,11 @@ export default function Users() {
               title="Editar"
               onClick={() => {
                 setSelected(row);
-                setEditForm({ name: row.name, phone: row.phone ?? "" });
+                setEditForm({
+                  name: row.name,
+                  email: row.email,
+                  phone: row.phone ?? "",
+                });
                 setFormError("");
                 setModal("edit");
               }}
@@ -563,7 +580,8 @@ export default function Users() {
               <FormField
                 label="Telefone"
                 required={
-                  createForm.role === "TEACHER" || createForm.role === "GUARDIAN"
+                  createForm.role === "TEACHER" ||
+                  createForm.role === "GUARDIAN"
                 }
               >
                 <Input
@@ -717,6 +735,14 @@ export default function Users() {
             <Input
               value={editForm.name}
               onChange={(v) => setEditForm((f) => ({ ...f, name: v }))}
+            />
+          </FormField>
+          <FormField label="E-mail" required>
+            <Input
+              type="email"
+              value={editForm.email}
+              onChange={(v) => setEditForm((f) => ({ ...f, email: v }))}
+              placeholder="email@exemplo.com"
             />
           </FormField>
           <FormField

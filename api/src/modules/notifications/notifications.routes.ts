@@ -5,6 +5,7 @@ import {
   getUnreadCount,
   markRead,
   markAllRead,
+  createNotification,
 } from "./notifications.controller";
 
 const router = Router();
@@ -29,6 +30,10 @@ router.patch(
   authorize(["SECRETARY", "TEACHER", "STUDENT", "GUARDIAN", "ADMIN_GLOBAL"]),
   markAllRead,
 );
+router.post(
+  "/notifications",
+  authorize(["SECRETARY", "ADMIN_GLOBAL"]),
+  createNotification,
+);
 
 export default router;
-

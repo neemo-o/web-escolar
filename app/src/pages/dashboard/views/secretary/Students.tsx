@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { cleanCpf, formatCpf, isValidCpf } from "../../../../utils/cpf";
+import { fetchCep } from "../../../../utils/cep";
 import {
   PageShell,
   Card,
@@ -107,7 +108,6 @@ const DOC_TYPE_OPTIONS = [
   { value: "OUTRO", label: "Outro" },
 ];
 
-
 const STATUS_LABEL: Record<string, string> = {
   ATIVO: "Ativo",
   TRANSFERIDO: "Transferido",
@@ -115,7 +115,6 @@ const STATUS_LABEL: Record<string, string> = {
   CONCLUIDO: "Concluído",
   CANCELADO: "Cancelado",
 };
-
 
 const DOC_TYPE_LABEL: Record<string, string> = {
   RG: "RG",
@@ -271,6 +270,7 @@ function StudentDetailModal({
   const [form, setForm] = useState({ ...emptyForm(), ...(student as any) });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
 
   // health
   const [health, setHealth] = useState<Health>({});
@@ -324,6 +324,23 @@ function StudentDetailModal({
 
   function setF(patch: Partial<Student>) {
     setForm((f: any) => ({ ...f, ...patch }));
+  }
+
+  async function handleCepChange(cep: string) {
+    setF({ zipCode: cep });
+    if (cep.replace(/\D/g, "").length === 8) {
+      setCepLoading(true);
+      const data = await fetchCep(cep);
+      if (data) {
+        setF({
+          street: data.street || "",
+          neighborhood: data.neighborhood || "",
+          city: data.city || "",
+          state: data.state || "",
+        });
+      }
+      setCepLoading(false);
+    }
   }
 
   async function loadHealth() {
@@ -659,8 +676,9 @@ function StudentDetailModal({
             <FormField label="CEP">
               <Input
                 value={form.zipCode}
-                onChange={(v) => setF({ zipCode: v })}
+                onChange={handleCepChange}
                 placeholder="00000-000"
+                loading={cepLoading}
               />
             </FormField>
             <FormField label="Rua / Logradouro">
@@ -1402,15 +1420,35 @@ function CreateStudentModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { user } = useAuth();
+  const canSeeCpf = user?.role === "SECRETARY";
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [createdPassword, setCreatedPassword] = useState("");
   const [copied, setCopied] = useState(false);
   const [done, setDone] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
 
   function setF(patch: any) {
     setForm((f) => ({ ...f, ...patch }));
+  }
+
+  async function handleCepChange(cep: string) {
+    setF({ zipCode: cep });
+    if (cep.replace(/\D/g, "").length === 8) {
+      setCepLoading(true);
+      const data = await fetchCep(cep);
+      if (data) {
+        setF({
+          street: data.street || "",
+          neighborhood: data.neighborhood || "",
+          city: data.city || "",
+          state: data.state || "",
+        });
+      }
+      setCepLoading(false);
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -1419,14 +1457,20 @@ function CreateStudentModal({
       setErr("Nome é obrigatório");
       return;
     }
-    setSaving(true);
+    // Validar CPF se fornecido e usuário tem permissão
+    if (canSeeCpf && form.cpf && !isValidCpf(form.cpf)) {
+      setErr("CPF inválido");
+      return;
+    }
     setErr("");
+    setSaving(true);
     try {
       const res = await api.fetchJson("/students", {
         method: "POST",
         body: JSON.stringify({
           name: form.name,
           socialName: form.socialName || undefined,
+          ...(canSeeCpf ? { cpf: form.cpf || undefined } : {}),
           rg: form.rg || undefined,
           birthCertificate: form.birthCertificate || undefined,
           birthDate: form.birthDate || undefined,
@@ -1441,6 +1485,7 @@ function CreateStudentModal({
           neighborhood: form.neighborhood || undefined,
           city: form.city || undefined,
           state: form.state || undefined,
+          status: form.status || "ATIVO",
         }),
       });
       setCreatedPassword(res?.temporaryPassword ?? "");
@@ -1576,6 +1621,15 @@ function CreateStudentModal({
               placeholder="Selecione..."
             />
           </FormField>
+          {canSeeCpf && (
+            <FormField label="CPF">
+              <Input
+                value={formatCpf(form.cpf)}
+                onChange={(v) => setF({ cpf: cleanCpf(v) })}
+                placeholder="000.000.000-00"
+              />
+            </FormField>
+          )}
           <FormField label="RG">
             <Input value={form.rg} onChange={(v) => setF({ rg: v })} />
           </FormField>
@@ -1746,6 +1800,9 @@ export default function Students() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  const { user } = useAuth();
+  const canSeeCpf = user?.role === "SECRETARY";
+
   const columns = [
     {
       key: "name",
@@ -1762,6 +1819,11 @@ export default function Students() {
             ) : null}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+            {canSeeCpf && row.maskedCpf ? (
+              <span style={{ fontFamily: "monospace" }}>
+                {row.maskedCpf} ·{" "}
+              </span>
+            ) : null}
             {row.phone ? row.phone : "—"}
           </p>
         </div>

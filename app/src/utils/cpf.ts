@@ -5,7 +5,12 @@ export function cleanCpf(raw: string | null | undefined): string {
 
 export function formatCpf(raw: string | null | undefined): string {
   const cpf = cleanCpf(raw);
-  if (cpf.length !== 11) return "";
+  // Don't return empty string - return formatted value as user types
+  if (cpf.length === 0) return "";
+  if (cpf.length <= 3) return cpf;
+  if (cpf.length <= 6) return `${cpf.slice(0, 3)}.${cpf.slice(3)}`;
+  if (cpf.length <= 9)
+    return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6)}`;
   return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9, 11)}`;
 }
 
@@ -41,4 +46,3 @@ export function maskCpf(raw: string | null | undefined): string {
   const p4 = cpf.substring(9, 11);
   return `${p1}.***.***-${p4}`;
 }
-

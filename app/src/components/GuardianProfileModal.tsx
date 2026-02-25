@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/api";
+import { fetchCep } from "../utils/cep";
 import {
   Modal,
   FormField,
@@ -74,6 +75,7 @@ export default function GuardianProfileModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
   const [form, setForm] = useState({
     rg: "",
     birthDate: "",
@@ -90,6 +92,23 @@ export default function GuardianProfileModal({
 
   function setF(patch: any) {
     setForm((f) => ({ ...f, ...patch }));
+  }
+
+  async function handleCepChange(cep: string) {
+    setF({ zipCode: cep });
+    if (cep.replace(/\D/g, "").length === 8) {
+      setCepLoading(true);
+      const data = await fetchCep(cep);
+      if (data) {
+        setF({
+          street: data.street || "",
+          neighborhood: data.neighborhood || "",
+          city: data.city || "",
+          state: data.state || "",
+        });
+      }
+      setCepLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -202,8 +221,9 @@ export default function GuardianProfileModal({
             <FormField label="CEP">
               <Input
                 value={form.zipCode}
-                onChange={(v) => setF({ zipCode: v })}
+                onChange={handleCepChange}
                 placeholder="00000-000"
+                loading={cepLoading}
               />
             </FormField>
             <FormField label="Rua">
