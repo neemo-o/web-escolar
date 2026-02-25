@@ -29,6 +29,7 @@ router.get(
 router.get(
   "/enrollments/:enrollmentId/grades",
   authorize(["TEACHER", "SECRETARY", "STUDENT", "GUARDIAN"]),
+  requireClassroomAccess,
   listGrades,
 );
 

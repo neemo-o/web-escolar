@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
+import { useAuth } from "../../../../contexts/AuthContext";
+import { cleanCpf, formatCpf, isValidCpf } from "../../../../utils/cpf";
 import {
   PageShell,
   Card,
@@ -263,6 +265,8 @@ function StudentDetailModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { user } = useAuth();
+  const canSeeCpf = user?.role === "SECRETARY";
   const [tab, setTab] = useState<Tab>("dados");
   const [form, setForm] = useState({ ...emptyForm(), ...(student as any) });
   const [saving, setSaving] = useState(false);
@@ -318,9 +322,9 @@ function StudentDetailModal({
     if (tab === "historico") loadHistory();
   }, [tab]);
 
-function setF(patch: Partial<Student>) {
-    setForm((f ) => ({ ...f, ...patch }));
-}
+  function setF(patch: Partial<Student>) {
+    setForm((f: any) => ({ ...f, ...patch }));
+  }
 
   async function loadHealth() {
     setHealthLoading(true);
@@ -379,6 +383,10 @@ function setF(patch: Partial<Student>) {
       setErr("Nome é obrigatório");
       return;
     }
+    if (canSeeCpf && form.cpf && !isValidCpf(form.cpf)) {
+      setErr("CPF inválido");
+      return;
+    }
     setSaving(true);
     setErr("");
     try {
@@ -387,7 +395,7 @@ function setF(patch: Partial<Student>) {
         body: JSON.stringify({
           name: form.name,
           socialName: form.socialName || undefined,
-          cpf: form.cpf || undefined,
+          ...(canSeeCpf ? { cpf: form.cpf || undefined } : {}),
           rg: form.rg || undefined,
           birthCertificate: form.birthCertificate || undefined,
           birthDate: form.birthDate || undefined,
@@ -579,18 +587,15 @@ function setF(patch: Partial<Student>) {
                 placeholder="Selecione..."
               />
             </FormField>
-            <FormField label="CPF">
-              <div style={{ marginBottom: 8 }}>
-                <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                  Visualização: <strong>{form.cpf ? form.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : 'Não informado'}</strong>
-                </p>
-              </div>
-              <Input
-                value={form.cpf}
-                onChange={(v) => setF({ cpf: v })}
-                placeholder="000.000.000-00"
-              />
-            </FormField>
+            {canSeeCpf && (
+              <FormField label="CPF">
+                <Input
+                  value={formatCpf(form.cpf)}
+                  onChange={(v) => setF({ cpf: cleanCpf(v) })}
+                  placeholder="000.000.000-00"
+                />
+              </FormField>
+            )}
             <FormField label="RG">
               <Input value={form.rg} onChange={(v) => setF({ rg: v })} />
             </FormField>
@@ -1422,7 +1427,6 @@ function CreateStudentModal({
         body: JSON.stringify({
           name: form.name,
           socialName: form.socialName || undefined,
-          cpf: form.cpf || undefined,
           rg: form.rg || undefined,
           birthCertificate: form.birthCertificate || undefined,
           birthDate: form.birthDate || undefined,
@@ -1570,18 +1574,6 @@ function CreateStudentModal({
               onChange={(v) => setF({ gender: v })}
               options={GENDER_OPTIONS}
               placeholder="Selecione..."
-            />
-          </FormField>
-          <FormField label="CPF">
-            <div style={{ marginBottom: 8 }}>
-              <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                Visualização: <strong>{form.cpf ? form.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : 'Não informado'}</strong>
-              </p>
-            </div>
-            <Input
-              value={form.cpf}
-              onChange={(v) => setF({ cpf: v })}
-              placeholder="000.000.000-00"
             />
           </FormField>
           <FormField label="RG">
@@ -1770,7 +1762,7 @@ export default function Students() {
             ) : null}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-            {row.maskedCpf || "Sem CPF"} {row.phone ? ` · ${row.phone}` : ""}
+            {row.phone ? row.phone : "—"}
           </p>
         </div>
       ),

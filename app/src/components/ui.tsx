@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 
-const accent = "#0891b2";
+const accent = "var(--school-primary, #0891b2)";
 
 export function PageShell({
   title,
@@ -948,7 +948,7 @@ export function StatCard({
 
 export function toast(
   message: string,
-  type: "success" | "error" | "info" = "success",
+  type: "success" | "error" | "warning" | "info" = "success",
 ) {
   try {
     window.dispatchEvent(

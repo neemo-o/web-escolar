@@ -7,6 +7,8 @@ import getParam from "../../utils/getParam";
 
 export async function createAssessment(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const { classroomId, subjectId, periodId, title, type, maxScore, date } = req.body;
   const createdById = (req.user as any)?.id;
 
@@ -37,6 +39,8 @@ export async function createAssessment(req: Request, res: Response) {
 
 export async function listAssessments(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const page = parseInt(String(req.query.page || "1"), 10) || 1;
   const limit = Math.min(parseInt(String(req.query.limit || "20"), 10) || 20, 100);
   const skip = (page - 1) * limit;
@@ -61,7 +65,7 @@ export async function listAssessments(req: Request, res: Response) {
     });
     const classroomIds = links.map((l) => l.classroomId);
     if (classroomIds.length === 0) return res.json({ data: [], meta: { total: 0, page, limit } });
-    if (!filters.classroomId) filters.classroomId = classroomIds;
+    filters.classroomId = classroomIds;
   } else if (requester.role === "STUDENT") {
     const student = await prisma.student.findFirst({
       where: { userId: requester.id, schoolId: requester.schoolId ?? undefined },
@@ -101,6 +105,8 @@ export async function listAssessments(req: Request, res: Response) {
 
 export async function getAssessment(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const id = getParam(req, "id");
   const item = await service.findAssessmentById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Avaliação não encontrada" });
@@ -116,6 +122,8 @@ export async function getAssessment(req: Request, res: Response) {
 
 export async function updateAssessment(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const id = getParam(req, "id");
   const existing = await service.findAssessmentById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Avaliação não encontrada" });
@@ -132,6 +140,8 @@ export async function updateAssessment(req: Request, res: Response) {
 
 export async function removeAssessment(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const id = getParam(req, "id");
   const existing = await service.findAssessmentById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Avaliação não encontrada" });

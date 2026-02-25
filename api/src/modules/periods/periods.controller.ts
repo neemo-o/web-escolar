@@ -6,6 +6,8 @@ import getParam from "../../utils/getParam";
 
 export async function createPeriod(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const yearId = getParam(req, "yearId");
   const { name, sequence, startDate, endDate } = req.body;
 

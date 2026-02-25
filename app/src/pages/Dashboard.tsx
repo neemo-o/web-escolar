@@ -8,12 +8,29 @@ import Sidebar from "./dashboard/Sidebar";
 import { PAGE_TITLES } from "./dashboard/nav";
 import { ROLE_COLORS, ROLE_LABELS } from "./dashboard/constants";
 import { iconMenu, iconClose, iconLogout } from "./dashboard/icons";
+import api from "../utils/api";
+
+function formatRemaining(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 export default function Dashboard() {
-  const { user: authUser, school: authSchool, logout, isLoading } = useAuth();
+  const {
+    user: authUser,
+    school: authSchool,
+    logout,
+    isLoading,
+    sessionSecondsRemaining,
+  } = useAuth();
   const [activePage, setActivePage] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { w } = useWindowSize();
 
   const isMobile = w < 768;
@@ -22,6 +39,231 @@ export default function Dashboard() {
   const role = user?.role || "STUDENT";
   const accentColor = ROLE_COLORS[role] || "#6366f1";
   const SIDEBAR_W = 240;
+
+  const showSession = typeof sessionSecondsRemaining === "number";
+  const isSessionWarning =
+    typeof sessionSecondsRemaining === "number" &&
+    sessionSecondsRemaining > 0 &&
+    sessionSecondsRemaining <= 5 * 60;
+
+  const SessionPill = () =>
+    showSession ? (
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: "1px solid",
+          borderColor: isSessionWarning ? "#fed7aa" : "#e5e7eb",
+          background: isSessionWarning ? "#fff7ed" : "#f9fafb",
+          color: isSessionWarning ? "#9a3412" : "#374151",
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: "0.1px",
+          whiteSpace: "nowrap",
+        }}
+        title="Tempo restante da sessão"
+      >
+        <span style={{ opacity: 0.9 }}>Sessão</span>
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          {formatRemaining(Math.max(0, sessionSecondsRemaining || 0))}
+        </span>
+      </div>
+    ) : null;
+
+  async function refreshNotifications() {
+    try {
+      const [countRes, listRes] = await Promise.all([
+        api.fetchJson("/notifications/unread-count"),
+        api.fetchJson("/notifications?limit=12"),
+      ]);
+      setUnreadCount(countRes?.unread ?? 0);
+      setNotifications(listRes?.data ?? []);
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    refreshNotifications();
+    const t = window.setInterval(() => refreshNotifications(), 30000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    setNotifLoading(true);
+    refreshNotifications().finally(() => setNotifLoading(false));
+  }, [notifOpen]);
+
+  const BellButton = () => (
+    <button
+      onClick={() => setNotifOpen((v) => !v)}
+      title="Notificações"
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        border: "1px solid #e5e7eb",
+        background: "#fff",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        color: "#374151",
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+      {unreadCount > 0 && (
+        <span
+          style={{
+            position: "absolute",
+            top: -4,
+            right: -4,
+            minWidth: 18,
+            height: 18,
+            padding: "0 5px",
+            borderRadius: 999,
+            background: "var(--school-primary, #0891b2)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 800,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
+          }}
+        >
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      )}
+    </button>
+  );
+
+  const NotificationsPanel = () =>
+    notifOpen ? (
+      <div
+        style={{
+          position: "absolute",
+          top: 48,
+          right: 0,
+          width: 360,
+          maxWidth: "calc(100vw - 40px)",
+          background: "#fff",
+          border: "1px solid #e9ebf0",
+          borderRadius: 14,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+          overflow: "hidden",
+          zIndex: 80,
+        }}
+      >
+        <div
+          style={{
+            padding: "12px 14px",
+            borderBottom: "1px solid #f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 13.5, color: "#111827" }}>
+            Notificações
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                await api.fetchJson("/notifications/read-all", {
+                  method: "PATCH",
+                });
+                await refreshNotifications();
+              } catch {}
+            }}
+            style={{
+              border: "1px solid #e5e7eb",
+              background: "#fff",
+              borderRadius: 10,
+              height: 30,
+              padding: "0 10px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              color: "#374151",
+              fontFamily: "inherit",
+            }}
+          >
+            Marcar como lidas
+          </button>
+        </div>
+
+        <div style={{ maxHeight: 360, overflowY: "auto" }}>
+          {notifLoading ? (
+            <div style={{ padding: 14, color: "#9ca3af", fontSize: 13 }}>
+              Carregando...
+            </div>
+          ) : notifications.length === 0 ? (
+            <div style={{ padding: 14, color: "#9ca3af", fontSize: 13 }}>
+              Sem notificações.
+            </div>
+          ) : (
+            notifications.map((n) => (
+              <button
+                key={n.id}
+                onClick={async () => {
+                  try {
+                    await api.fetchJson(`/notifications/${n.id}/read`, {
+                      method: "PATCH",
+                    });
+                    await refreshNotifications();
+                  } catch {}
+                }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "12px 14px",
+                  border: "none",
+                  borderBottom: "1px solid #f8fafc",
+                  background: n.readAt ? "#fff" : "#f0f9ff",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: "#111827",
+                  }}
+                >
+                  {n.title}
+                </div>
+                <div
+                  style={{ marginTop: 2, fontSize: 12.5, color: "#6b7280" }}
+                >
+                  {n.message}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11.5, color: "#9ca3af" }}>
+                  {String(n.createdAt).slice(0, 19).replace("T", " ")}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    ) : null;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 40);
@@ -162,6 +404,21 @@ export default function Dashboard() {
             >
               {PAGE_TITLES[activePage] || "Dashboard"}
             </span>
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                position: "relative",
+              }}
+            >
+              <SessionPill />
+              <div style={{ position: "relative" }}>
+                <BellButton />
+                <NotificationsPanel />
+              </div>
+            </div>
           </div>
         )}
 
@@ -198,7 +455,19 @@ export default function Dashboard() {
                 {PAGE_TITLES[activePage] || "Dashboard"}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                position: "relative",
+              }}
+            >
+              <SessionPill />
+              <div style={{ position: "relative" }}>
+                <BellButton />
+                <NotificationsPanel />
+              </div>
               <div
                 style={{
                   padding: "4px 10px",

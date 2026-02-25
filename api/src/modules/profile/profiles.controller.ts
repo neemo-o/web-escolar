@@ -2,11 +2,14 @@ import { Request, Response } from "express";
 import { getSchoolId } from "../../middlewares/tenant";
 import getParam from "../../utils/getParam";
 import { prisma } from "../../config/prisma";
+import { cleanCpf, isValidCpf } from "../../utils/cpf";
 
 // ── TEACHER PROFILE ───────────────────────────────────────────────────────────
 
 export async function getTeacherProfile(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const userId = getParam(req, "userId");
 
   const user = await prisma.user.findFirst({
@@ -14,12 +17,20 @@ export async function getTeacherProfile(req: Request, res: Response) {
   });
   if (!user) return res.status(404).json({ error: "Professor não encontrado" });
 
-  const profile = await prisma.teacherProfile.findUnique({ where: { userId } });
-  return res.json(profile ?? {});
+  const profile = (await prisma.teacherProfile.findUnique({
+    where: { userId },
+  })) as any;
+  if (!profile) return res.json({});
+
+  delete profile.cpf;
+
+  return res.json(profile);
 }
 
 export async function upsertTeacherProfile(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const userId = getParam(req, "userId");
 
   const user = await prisma.user.findFirst({
@@ -51,13 +62,18 @@ export async function upsertTeacherProfile(req: Request, res: Response) {
     canViewReports,
   } = req.body;
 
+  if (cpf && !isValidCpf(cpf)) {
+    return res.status(400).json({ error: "CPF inválido" });
+  }
+  const cleanedCpf = cpf !== undefined && cpf ? cleanCpf(cpf) : cpf;
+
   const profile = await prisma.teacherProfile.upsert({
     where: { userId },
     create: {
       schoolId,
       userId,
       internalCode: internalCode ?? null,
-      cpf: cpf ?? null,
+      cpf: cleanedCpf ?? null,
       rg: rg ?? null,
       birthDate: birthDate ? new Date(birthDate) : null,
       gender: gender ?? null,
@@ -81,7 +97,7 @@ export async function upsertTeacherProfile(req: Request, res: Response) {
     update: {
       internalCode:
         internalCode !== undefined ? internalCode || null : undefined,
-      cpf: cpf !== undefined ? cpf || null : undefined,
+      cpf: cpf !== undefined ? (cleanedCpf ? cleanedCpf : null) : undefined,
       rg: rg !== undefined ? rg || null : undefined,
       birthDate:
         birthDate !== undefined
@@ -118,13 +134,17 @@ export async function upsertTeacherProfile(req: Request, res: Response) {
     },
   });
 
-  return res.json(profile);
+  const out: any = { ...profile };
+  delete out.cpf;
+  return res.json(out);
 }
 
 // ── GUARDIAN PROFILE ──────────────────────────────────────────────────────────
 
 export async function getGuardianProfile(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const userId = getParam(req, "userId");
 
   const user = await prisma.user.findFirst({
@@ -133,14 +153,20 @@ export async function getGuardianProfile(req: Request, res: Response) {
   if (!user)
     return res.status(404).json({ error: "Responsável não encontrado" });
 
-  const profile = await prisma.guardianProfile.findUnique({
+  const profile = (await prisma.guardianProfile.findUnique({
     where: { userId },
-  });
-  return res.json(profile ?? {});
+  })) as any;
+  if (!profile) return res.json({});
+
+  delete profile.cpf;
+
+  return res.json(profile);
 }
 
 export async function upsertGuardianProfile(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const userId = getParam(req, "userId");
 
   const user = await prisma.user.findFirst({
@@ -164,12 +190,17 @@ export async function upsertGuardianProfile(req: Request, res: Response) {
     state,
   } = req.body;
 
+  if (cpf && !isValidCpf(cpf)) {
+    return res.status(400).json({ error: "CPF inválido" });
+  }
+  const cleanedCpf = cpf !== undefined && cpf ? cleanCpf(cpf) : cpf;
+
   const profile = await prisma.guardianProfile.upsert({
     where: { userId },
     create: {
       schoolId,
       userId,
-      cpf: cpf ?? null,
+      cpf: cleanedCpf ?? null,
       rg: rg ?? null,
       birthDate: birthDate ? new Date(birthDate) : null,
       maritalStatus: maritalStatus ?? null,
@@ -183,7 +214,7 @@ export async function upsertGuardianProfile(req: Request, res: Response) {
       state: state ?? null,
     },
     update: {
-      cpf: cpf !== undefined ? cpf || null : undefined,
+      cpf: cpf !== undefined ? (cleanedCpf ? cleanedCpf : null) : undefined,
       rg: rg !== undefined ? rg || null : undefined,
       birthDate:
         birthDate !== undefined
@@ -207,5 +238,7 @@ export async function upsertGuardianProfile(req: Request, res: Response) {
     },
   });
 
-  return res.json(profile);
+  const out: any = { ...profile };
+  delete out.cpf;
+  return res.json(out);
 }

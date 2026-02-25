@@ -5,6 +5,8 @@ import getParam from "../../utils/getParam";
 
 export async function createAcademicYear(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const { year, startDate, endDate } = req.body;
 
   if (!year || !startDate || !endDate) {

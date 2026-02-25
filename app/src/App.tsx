@@ -83,7 +83,7 @@ function App() {
               >
                 Carregando...
               </div>
-            ) : !isAuthenticated ? (
+            ) : isAuthenticated ? (
               <Navigate to="/dashboard" replace />
             ) : (
               <ForgotPasswordPage />

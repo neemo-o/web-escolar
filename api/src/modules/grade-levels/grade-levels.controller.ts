@@ -5,6 +5,8 @@ import { getSchoolId } from "../../middlewares/tenant";
 
 export async function createGradeLevel(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const { name, code, description, sortOrder } = req.body;
 
   if (!name || !code)

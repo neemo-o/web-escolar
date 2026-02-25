@@ -139,6 +139,7 @@ model School {
   studentGuardians   StudentGuardian[]
   users              User[]
   enrollments        Enrollment[]
+  notifications      Notification[]
 
   @@map("schools")
 }
@@ -202,19 +203,21 @@ model User {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  school              School?              @relation(fields: [schoolId], references: [id])
-  studentProfile      Student?             @relation("StudentUser")
-  teacherProfile      TeacherProfile?      @relation("TeacherUser")
-  guardianProfile     GuardianProfile?     @relation("GuardianUser")
-  classroomTeachings  ClassroomTeacher[]   @relation("TeacherInClassroom")
-  gradeLaunches       StudentGrade[]       @relation("GradeLaunchedBy")
-  attendanceSessions  AttendanceSession[]  @relation("SessionCreatedBy")
-  activitiesCreated   Activity[]           @relation("ActivityCreatedBy")
-  assessmentsCreated  Assessment[]         @relation("AssessmentCreatedBy")
-  submissionFeedbacks ActivitySubmission[] @relation("FeedbackBy")
-  guardianStudents    StudentGuardian[]    @relation("GuardianUser")
-  gradeAudits         GradeAudit[]         @relation("GradeAuditChangedBy")
-  enrollmentHistories EnrollmentHistory[]  @relation("MovementCreatedBy")
+  school                          School?              @relation(fields: [schoolId], references: [id])
+  studentProfile                  Student?             @relation("StudentUser")
+  teacherProfile                  TeacherProfile?      @relation("TeacherUser")
+  guardianProfile                 GuardianProfile?     @relation("GuardianUser")
+  classroomTeachings              ClassroomTeacher[]   @relation("TeacherInClassroom")
+  gradeLaunches                   StudentGrade[]       @relation("GradeLaunchedBy")
+  attendanceSessions              AttendanceSession[]  @relation("SessionCreatedBy")
+  activitiesCreated               Activity[]           @relation("ActivityCreatedBy")
+  assessmentsCreated              Assessment[]         @relation("AssessmentCreatedBy")
+  submissionFeedbacks             ActivitySubmission[] @relation("FeedbackBy")
+  guardianStudents                StudentGuardian[]    @relation("GuardianUser")
+  gradeAudits                     GradeAudit[]         @relation("GradeAuditChangedBy")
+  enrollmentHistories             EnrollmentHistory[]  @relation("MovementCreatedBy")
+  financialResponsibleEnrollments Enrollment[]         @relation("EnrollmentFinancialResponsible")
+  notifications                   Notification[]
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -263,7 +266,7 @@ model GuardianProfile {
   id             String    @id @default(uuid()) @db.Uuid
   schoolId       String    @db.Uuid
   userId         String    @unique @db.Uuid
-  cpf            String?    @db.VarChar(20)
+  cpf            String?   @db.VarChar(20)
   rg             String?   @db.VarChar(20)
   birthDate      DateTime? @db.Date
   maritalStatus  String?   @db.VarChar(50)
@@ -468,7 +471,7 @@ model Student {
   schoolId         String        @db.Uuid
   name             String        @db.VarChar(200)
   socialName       String?       @db.VarChar(200)
-  cpf              String?        @db.VarChar(20)
+  cpf              String?       @db.VarChar(20)
   rg               String?       @db.VarChar(20)
   birthCertificate String?       @db.VarChar(50)
   birthDate        DateTime?     @db.Date
@@ -564,36 +567,74 @@ model StudentGuardian {
 }
 
 model Enrollment {
-  id               String           @id @default(uuid()) @db.Uuid
-  schoolId         String           @db.Uuid
-  studentId        String           @db.Uuid
-  classroomId      String           @db.Uuid
-  academicYearId   String           @db.Uuid
-  enrollmentNumber String           @db.VarChar(20)
-  status           EnrollmentStatus @default(ATIVA)
-  enrolledAt       DateTime         @db.Date
-  exitDate         DateTime?        @db.Date
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  deletedAt        DateTime?
+  id                             String           @id @default(uuid()) @db.Uuid
+  schoolId                       String           @db.Uuid
+  studentId                      String           @db.Uuid
+  classroomId                    String           @db.Uuid
+  academicYearId                 String           @db.Uuid
+  enrollmentNumber               String           @db.VarChar(20)
+  status                         EnrollmentStatus @default(ATIVA)
+  enrolledAt                     DateTime         @db.Date
+  exitDate                       DateTime?        @db.Date
+  financialResponsibleGuardianId String?          @db.Uuid
+  createdAt                      DateTime         @default(now())
+  updatedAt                      DateTime         @updatedAt
+  deletedAt                      DateTime?
 
-  school              School               @relation(fields: [schoolId], references: [id])
-  student             Student              @relation(fields: [studentId], references: [id])
-  classroom           Classroom            @relation(fields: [classroomId], references: [id])
-  academicYear        AcademicYear         @relation(fields: [academicYearId], references: [id])
-  studentGrades       StudentGrade[]
-  periodGrades        PeriodGrade[]
-  finalGrades         FinalGrade[]
-  attendanceRecords   AttendanceRecord[]
-  activitySubmissions ActivitySubmission[]
-  history             EnrollmentHistory[]
+  school                       School               @relation(fields: [schoolId], references: [id])
+  student                      Student              @relation(fields: [studentId], references: [id])
+  classroom                    Classroom            @relation(fields: [classroomId], references: [id])
+  academicYear                 AcademicYear         @relation(fields: [academicYearId], references: [id])
+  financialResponsibleGuardian User?                @relation("EnrollmentFinancialResponsible", fields: [financialResponsibleGuardianId], references: [id])
+  studentGrades                StudentGrade[]
+  periodGrades                 PeriodGrade[]
+  finalGrades                  FinalGrade[]
+  attendanceRecords            AttendanceRecord[]
+  activitySubmissions          ActivitySubmission[]
+  history                      EnrollmentHistory[]
+  documents                    EnrollmentDocument[]
 
   @@unique([schoolId, enrollmentNumber])
-  @@unique([schoolId, studentId, academicYearId])
   @@index([schoolId, academicYearId, status])
   @@index([schoolId, studentId])
   @@index([schoolId, classroomId])
   @@map("enrollments")
+}
+
+model EnrollmentDocument {
+  id           String       @id @default(uuid()) @db.Uuid
+  schoolId     String       @db.Uuid
+  enrollmentId String       @db.Uuid
+  type         DocumentType
+  name         String       @db.VarChar(200)
+  fileUrl      String?
+  delivered    Boolean      @default(false)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, enrollmentId])
+  @@map("enrollment_documents")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  schoolId  String    @db.Uuid
+  userId    String    @db.Uuid
+  type      String    @db.VarChar(60)
+  title     String    @db.VarChar(120)
+  message   String    @db.VarChar(500)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, readAt])
+  @@index([schoolId, createdAt])
+  @@map("notifications")
 }
 
 model EnrollmentHistory {

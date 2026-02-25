@@ -12,6 +12,9 @@ type AuthContextType = {
   token: string | null;
   user: any | null;
   school: any | null;
+  sessionExpiresAtMs: number | null;
+  sessionSecondsRemaining: number | null;
+  refreshSchool: () => Promise<void>;
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
@@ -32,11 +35,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   });
   const [user, setUser] = useState<any | null>(null);
   const [school, setSchool] = useState<any | null>(null);
+  const [sessionExpiresAtMs, setSessionExpiresAtMs] = useState<number | null>(
+    null,
+  );
+  const [sessionSecondsRemaining, setSessionSecondsRemaining] = useState<
+    number | null
+  >(null);
   const [isLoading, setIsLoading] = useState(
     () => !!localStorage.getItem("token"),
   );
   const navigate = useNavigate();
   const expirationTimer = useRef<number | null>(null);
+  const tickTimer = useRef<number | null>(null);
+
+  function applySchoolTheme(s: any | null) {
+    try {
+      const primary = s?.config?.primaryColor || "#0891b2";
+      const sidebar = s?.config?.secondaryColor || "#0e7490";
+      document.documentElement.style.setProperty("--school-primary", primary);
+      document.documentElement.style.setProperty("--school-sidebar", sidebar);
+    } catch {}
+  }
 
   function base64UrlDecode(input: string) {
     let s = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -78,18 +97,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }
 
+  function clearTickTimer() {
+    if (tickTimer.current) {
+      window.clearInterval(tickTimer.current);
+      tickTimer.current = null;
+    }
+  }
+
+  function computeExpiresAtMs(t: string | null): number | null {
+    const exp = parseJwtExp(t);
+    if (!exp) return null;
+    return exp * 1000;
+  }
+
   function scheduleExpiration(t: string | null) {
     clearExpirationTimer();
-    const exp = parseJwtExp(t);
-    if (exp) {
-      const ms = exp * 1000 - Date.now() - 60 * 1000; // 60s before
-      if (ms > 0) {
-        expirationTimer.current = window.setTimeout(() => {
-          // ensure we perform a full logout flow
-          logout();
-        }, ms);
-      }
+    const expiresAt = computeExpiresAtMs(t);
+    if (!expiresAt) return;
+    const ms = expiresAt - Date.now();
+    if (ms <= 0) {
+      logout();
+      return;
     }
+    expirationTimer.current = window.setTimeout(() => {
+      logout();
+    }, ms);
+  }
+
+  function startSessionTick(expiresAt: number | null) {
+    clearTickTimer();
+    setSessionExpiresAtMs(expiresAt);
+    if (!expiresAt) {
+      setSessionSecondsRemaining(null);
+      return;
+    }
+    const update = () => {
+      const s = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+      setSessionSecondsRemaining(s);
+      if (s <= 0) logout();
+    };
+    update();
+    tickTimer.current = window.setInterval(update, 1000);
   }
 
   // When token is present, try to fetch /auth/me to populate user
@@ -99,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!token) {
         setUser(null);
         setSchool(null);
+        startSessionTick(null);
         return;
       }
       // clear previous user/school to avoid leaking stale data while fetching
@@ -114,7 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (mounted) {
           if (data.status === "fulfilled") setUser(data.value);
           else setUser(null);
-          if (schoolData.status === "fulfilled") setSchool(schoolData.value);
+          if (schoolData.status === "fulfilled") {
+            setSchool(schoolData.value);
+            applySchoolTheme(schoolData.value);
+          }
           else setSchool(null);
         }
 
@@ -123,10 +175,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setToken(null);
           api.setAuthToken(null);
           clearExpirationTimer();
+          clearTickTimer();
+          setSessionExpiresAtMs(null);
+          setSessionSecondsRemaining(null);
           navigate("/login");
           setIsLoading(false);
           return;
         }
+        const expiresAt = computeExpiresAtMs(token);
+        startSessionTick(expiresAt);
         scheduleExpiration(token);
       } catch (err) {
         console.warn("Failed to fetch /auth/me", err);
@@ -144,6 +201,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = (t: string) => {
     setToken(t);
+    const expiresAt = computeExpiresAtMs(t);
+    startSessionTick(expiresAt);
     scheduleExpiration(t);
     // navigation happens after token is set and /auth/me will be triggered
     navigate("/dashboard");
@@ -153,9 +212,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setToken(null);
     setUser(null);
     setSchool(null);
+    setSessionExpiresAtMs(null);
+    setSessionSecondsRemaining(null);
     api.setAuthToken(null);
     if (expirationTimer.current) window.clearTimeout(expirationTimer.current);
+    clearTickTimer();
     navigate("/login");
+  };
+
+  const refreshSchool = async () => {
+    if (!token) return;
+    try {
+      const s = await api.fetchJson("/schools/me");
+      setSchool(s);
+      applySchoolTheme(s);
+    } catch {}
   };
 
   // listen to global auth:logout events (dispatched by fetchJson on 401)
@@ -183,6 +254,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         token,
         user,
         school,
+        sessionExpiresAtMs,
+        sessionSecondsRemaining,
+        refreshSchool,
         login,
         logout,
         // only consider authenticated when not loading and user+token present

@@ -17,6 +17,7 @@ import assessmentsRoutes from "./modules/assessments/assessments.routes";
 import profileRoutes from "./modules/profile/profiles.routes";
 import gradesRoutes from "./modules/grades/grades.routes";
 import attendanceRoutes from "./modules/attendance/attendance.routes";
+import notificationsRoutes from "./modules/notifications/notifications.routes";
 import { authenticate } from "./middlewares/authenticate";
 import { requireActiveSchool } from "./middlewares/requireActiveSchool";
 import { requireTenantMatch } from "./middlewares/tenant";
@@ -28,7 +29,12 @@ app.use(express.json({ limit: "100kb" }));
 
 // security and CORS middlewares
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || false, credentials: true }));
+const corsOrigin = process.env.CORS_ORIGIN;
+if (!corsOrigin) {
+  console.error("FATAL: CORS_ORIGIN não configurado");
+  process.exit(1);
+}
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
 // Public routes that must run before tenant middlewares
 app.use(schoolsRoutes);
@@ -54,6 +60,7 @@ app.use(gradesRoutes);
 app.use(attendanceRoutes);
 app.use(profileRoutes);
 app.use(usersRoutes);
+app.use(notificationsRoutes);
 
 // Global error handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

@@ -4,6 +4,8 @@ import { prisma } from "../../config/prisma";
 import { generateTempPassword } from "../../utils/password";
 import * as service from "./users.service";
 import getParam from "../../utils/getParam";
+import { cleanPhone, isValidBrPhone } from "../../utils/phone";
+import { createNotificationsForUsers } from "../notifications/notifications.service";
 
 export async function createUser(req: Request, res: Response) {
   const requester = req.user!;
@@ -32,12 +34,51 @@ export async function createUser(req: Request, res: Response) {
     }
   }
 
+  const phoneRequired = role === "TEACHER" || role === "GUARDIAN";
+  const cleanedPhone = phone ? cleanPhone(phone) : "";
+  if (phoneRequired && !cleanedPhone) {
+    return res.status(400).json({ error: "Telefone é obrigatório" });
+  }
+  if ((cleanedPhone || phoneRequired) && !isValidBrPhone(cleanedPhone)) {
+    return res.status(400).json({ error: "Telefone inválido" });
+  }
+
   try {
     const tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-    const data: any = { email, name, phone: phone ?? null, avatarUrl: avatarUrl ?? null, role, passwordHash, schoolId };
+    const data: any = {
+      email,
+      name,
+      phone: cleanedPhone ? cleanedPhone : null,
+      avatarUrl: avatarUrl ?? null,
+      role,
+      passwordHash,
+      schoolId,
+    };
     const user = await service.createUserRecord(data);
+    try {
+      if (schoolId) {
+        const secretaries = await prisma.user.findMany({
+          where: {
+            schoolId,
+            role: "SECRETARY",
+            active: true,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        await createNotificationsForUsers(
+          schoolId,
+          secretaries.map((u) => u.id),
+          {
+            type: "USER_CREATED",
+            title: "Usuário criado",
+            message: `${user.name} (${user.role}) foi criado no sistema.`,
+          },
+        );
+      }
+    } catch {}
     return res.status(201).json({ user, temporaryPassword: tempPassword });
   } catch (err: any) {
     if (err?.code === "P2002") {
@@ -69,7 +110,17 @@ export async function listUsers(req: Request, res: Response) {
     if (req.query.role) where.role = String(req.query.role);
   } else {
     where.schoolId = requester.schoolId;
-    if (req.query.role) where.role = String(req.query.role);
+    // Evita duplicidade com aba Alunos: não listar STUDENT neste endpoint para SECRETARY
+    const allowedRoles = ["SECRETARY", "TEACHER", "GUARDIAN"];
+    if (req.query.role) {
+      const r = String(req.query.role);
+      if (!allowedRoles.includes(r)) {
+        return res.status(403).json({ error: "Filtro de perfil inválido" });
+      }
+      where.role = r;
+    } else {
+      where.role = { in: allowedRoles };
+    }
   }
 
   // FIX #1: name search now works
@@ -114,9 +165,27 @@ export async function updateUser(req: Request, res: Response) {
     return res.status(403).json({ error: "Sem permissão para editar este usuário" });
   }
 
+  const phoneRequired = existing.role === "TEACHER" || existing.role === "GUARDIAN";
+  const cleanedPhone =
+    phone !== undefined ? (phone ? cleanPhone(phone) : "") : undefined;
+
+  if (phoneRequired && phone !== undefined && !cleanedPhone) {
+    return res.status(400).json({ error: "Telefone é obrigatório" });
+  }
+  if ((phoneRequired && phone !== undefined) || (cleanedPhone && phone !== undefined)) {
+    if (!isValidBrPhone(cleanedPhone)) {
+      return res.status(400).json({ error: "Telefone inválido" });
+    }
+  }
+
   const updated = await service.updateUserById(id, {
     name: name ?? undefined,
-    phone: phone ?? undefined,
+    phone:
+      phone !== undefined
+        ? cleanedPhone
+          ? cleanedPhone
+          : null
+        : undefined,
     avatarUrl: avatarUrl ?? undefined,
   });
 

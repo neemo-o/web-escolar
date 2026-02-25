@@ -6,6 +6,8 @@ import getParam from "../../utils/getParam";
 
 export async function createClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const { academicYearId, gradeLevelId, name, shift, capacity } = req.body;
 
   if (!academicYearId || !gradeLevelId || !name || !shift || capacity == null) {

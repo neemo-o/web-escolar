@@ -6,6 +6,8 @@ import { prisma } from "../../config/prisma";
 
 export async function createOrUpdateGrade(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const changedById = (req.user as any)?.id;
   const assessmentIdFromParams = (req.params as any).assessmentId;
   const { enrollmentId, score } = req.body;
@@ -16,6 +18,36 @@ export async function createOrUpdateGrade(req: Request, res: Response) {
       .json({ error: "assessmentId and enrollmentId required" });
 
   try {
+    const assessment = await prisma.assessment.findFirst({
+      where: { id: assessmentId, schoolId },
+    });
+    if (!assessment)
+      return res.status(404).json({ error: "Avaliação não encontrada" });
+
+    if (
+      typeof score !== "number" ||
+      Number.isNaN(score) ||
+      score < 0 ||
+      score > assessment.maxScore
+    ) {
+      return res.status(400).json({
+        error: "Pontuação inválida: deve estar entre 0 e a nota máxima",
+      });
+    }
+
+    const enrollment = await prisma.enrollment.findFirst({
+      where: { id: enrollmentId, schoolId },
+      select: { classroomId: true },
+    });
+    if (!enrollment)
+      return res.status(404).json({ error: "Matrícula não encontrada" });
+    if (enrollment.classroomId !== assessment.classroomId) {
+      return res.status(403).json({
+        error:
+          "Acesso negado: matrícula não pertence à turma desta avaliação",
+      });
+    }
+
     const result = await service.createOrUpdateGrade(
       { schoolId, assessmentId, enrollmentId, score },
       changedById,

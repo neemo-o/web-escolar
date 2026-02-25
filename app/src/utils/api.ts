@@ -46,4 +46,37 @@ export async function fetchJson(input: string, init?: RequestInit) {
   return data;
 }
 
-export default { fetchJson, setAuthToken };
+export async function fetchBlob(input: string, init?: RequestInit) {
+  const base = (import.meta.env.VITE_API_BASE as string) || "/api";
+  const url = input.startsWith("http")
+    ? input
+    : `${base}${input.startsWith("/") ? "" : "/"}${input}`;
+
+  const token =
+    moduleToken ??
+    (typeof window !== "undefined" ? localStorage.getItem("token") : null);
+
+  const headers: Record<string, string> = {
+    ...(init && (init.headers as Record<string, string>)),
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, { ...(init || {}), headers });
+  if (!res.ok) {
+    if (res.status === 401) {
+      try {
+        window.dispatchEvent(new Event("auth:logout"));
+      } catch {}
+    }
+    let message = res.statusText;
+    try {
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      message = data?.error || data?.message || message;
+    } catch {}
+    throw new Error(message || "Erro na requisição");
+  }
+  return await res.blob();
+}
+
+export default { fetchJson, fetchBlob, setAuthToken };

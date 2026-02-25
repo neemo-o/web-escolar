@@ -7,6 +7,8 @@ import getParam from "../../utils/getParam";
 
 export async function createSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const createdById = (req.user as any)?.id;
   const { classroomId, subjectId, date, totalSlots, notes } = req.body;
 
@@ -43,6 +45,8 @@ export async function createSession(req: Request, res: Response) {
 
 export async function listSessions(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const page = parseInt(String(req.query.page || "1"), 10) || 1;
   const limit = Math.min(
     parseInt(String(req.query.limit || "20"), 10) || 20,
@@ -128,6 +132,8 @@ export async function listSessions(req: Request, res: Response) {
 
 export async function getSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const id = getParam(req, "id");
   const item = await service.findSessionById(id, schoolId);
   if (!item) return res.status(404).json({ error: "Session not found" });
@@ -136,6 +142,8 @@ export async function getSession(req: Request, res: Response) {
 
 export async function updateSession(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const id = getParam(req, "id");
   const existing = await service.findSessionById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Session not found" });
@@ -161,6 +169,8 @@ export async function removeSession(req: Request, res: Response) {
 
 export async function markRecords(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const sessionId = getParam(req, "id");
   const items: Array<{
     enrollmentId: string;
@@ -173,12 +183,28 @@ export async function markRecords(req: Request, res: Response) {
   if (!session) return res.status(404).json({ error: "Session not found" });
 
   try {
+    const enrollmentIds = items.map((i) => i.enrollmentId);
+    if (enrollmentIds.length > 0) {
+      const validEnrollments = await prisma.enrollment.findMany({
+        where: {
+          id: { in: enrollmentIds },
+          classroomId: session.classroomId,
+          schoolId,
+        },
+        select: { id: true },
+      });
+      const validIds = new Set(validEnrollments.map((e) => e.id));
+      const hasInvalid = enrollmentIds.some((id) => !validIds.has(id));
+      if (hasInvalid) {
+        return res.status(403).json({
+          error:
+            "Acesso negado: pelo menos uma matrícula não pertence à turma desta sessão",
+        });
+      }
+    }
+
     const results = [] as any[];
     for (const it of items) {
-      const enrollment = await prisma.enrollment.findFirst({
-        where: { id: it.enrollmentId, schoolId, deletedAt: null },
-      });
-      if (!enrollment) continue;
       const r = await service.upsertRecord(
         schoolId,
         sessionId,

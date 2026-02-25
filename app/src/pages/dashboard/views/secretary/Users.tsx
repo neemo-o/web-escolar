@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../../utils/api";
+import { useAuth } from "../../../../contexts/AuthContext";
+import { cleanPhone, formatBrPhone, isValidBrPhone } from "../../../../utils/phone";
 import {
   PageShell,
   Card,
@@ -80,7 +82,19 @@ const emptyCreate = (): CreateForm => ({
 
 const LIMIT = 20;
 
+function formatPhonePartial(raw: string) {
+  const d = cleanPhone(raw);
+  if (!d) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
+}
+
 export default function Users() {
+  const { user: authUser } = useAuth();
+  const requesterRole = authUser?.role || "";
   const [items, setItems] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -179,6 +193,16 @@ export default function Users() {
       setFormError("Nome e e-mail são obrigatórios.");
       return;
     }
+    const phoneDigits = cleanPhone(f.phone);
+    const phoneRequired = f.role === "TEACHER" || f.role === "GUARDIAN";
+    if (phoneRequired && !phoneDigits) {
+      setFormError("Telefone é obrigatório.");
+      return;
+    }
+    if ((phoneDigits || phoneRequired) && !isValidBrPhone(phoneDigits)) {
+      setFormError("Telefone inválido.");
+      return;
+    }
     if (f.role === "GUARDIAN" && !f.studentId) {
       setFormError("Selecione o aluno vinculado.");
       return;
@@ -192,7 +216,7 @@ export default function Users() {
           name: f.name,
           email: f.email,
           role: f.role,
-          phone: f.phone || undefined,
+          phone: phoneDigits || undefined,
         }),
       });
       const tempPassword = res?.temporaryPassword ?? "";
@@ -233,6 +257,17 @@ export default function Users() {
       setFormError("Nome é obrigatório.");
       return;
     }
+    const phoneDigits = cleanPhone(editForm.phone);
+    const phoneRequired =
+      selected.role === "TEACHER" || selected.role === "GUARDIAN";
+    if (phoneRequired && !phoneDigits) {
+      setFormError("Telefone é obrigatório.");
+      return;
+    }
+    if ((phoneDigits || phoneRequired) && !isValidBrPhone(phoneDigits)) {
+      setFormError("Telefone inválido.");
+      return;
+    }
     setSaving(true);
     setFormError("");
     try {
@@ -240,7 +275,7 @@ export default function Users() {
         method: "PATCH",
         body: JSON.stringify({
           name: editForm.name,
-          phone: editForm.phone || undefined,
+          phone: phoneDigits || undefined,
         }),
       });
       toast("Usuário atualizado!");
@@ -316,7 +351,7 @@ export default function Users() {
       label: "Telefone",
       render: (row: User) => (
         <span style={{ fontSize: 13, color: "#6b7280" }}>
-          {row.phone || "—"}
+          {formatBrPhone(row.phone) || "—"}
         </span>
       ),
     },
@@ -335,7 +370,7 @@ export default function Users() {
       label: "",
       render: (row: User) => (
         <div style={{ display: "flex", gap: 4 }}>
-          {row.role !== "TEACHER" && row.role !== "GUARDIAN" && (
+          {!(requesterRole === "SECRETARY" && row.role === "SECRETARY") && (
             <IconButton
               icon="edit"
               title="Editar"
@@ -525,10 +560,15 @@ export default function Users() {
                   placeholder="email@exemplo.com"
                 />
               </FormField>
-              <FormField label="Telefone">
+              <FormField
+                label="Telefone"
+                required={
+                  createForm.role === "TEACHER" || createForm.role === "GUARDIAN"
+                }
+              >
                 <Input
-                  value={createForm.phone}
-                  onChange={(v) => setC({ phone: v })}
+                  value={formatPhonePartial(createForm.phone)}
+                  onChange={(v) => setC({ phone: cleanPhone(v) })}
                   placeholder="(00) 00000-0000"
                 />
               </FormField>
@@ -679,10 +719,17 @@ export default function Users() {
               onChange={(v) => setEditForm((f) => ({ ...f, name: v }))}
             />
           </FormField>
-          <FormField label="Telefone">
+          <FormField
+            label="Telefone"
+            required={
+              selected?.role === "TEACHER" || selected?.role === "GUARDIAN"
+            }
+          >
             <Input
-              value={editForm.phone}
-              onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))}
+              value={formatPhonePartial(editForm.phone)}
+              onChange={(v) =>
+                setEditForm((f) => ({ ...f, phone: cleanPhone(v) }))
+              }
               placeholder="(00) 00000-0000"
             />
           </FormField>

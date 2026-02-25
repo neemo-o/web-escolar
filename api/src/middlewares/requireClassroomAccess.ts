@@ -13,20 +13,39 @@ export async function requireClassroomAccess(
     (req.body && req.body.classroomId);
 
   if (!classroomId) {
-    const sessionId = (req.params as any).sessionId || (req.params as any).id;
-    const assessmentId = (req.params as any).assessmentId;
-    if (sessionId) {
-      const session = await prisma.attendanceSession.findFirst({
-        where: { id: sessionId },
+    const hasAttendanceInPath = req.path.includes("/attendance/");
+    const explicitSessionId = (req.params as any).sessionId;
+    const explicitAssessmentId = (req.params as any).assessmentId;
+    const routeId = (req.params as any).id;
+    const enrollmentId = (req.params as any).enrollmentId;
+
+    if (hasAttendanceInPath || explicitSessionId) {
+      const sessionId = explicitSessionId || routeId;
+      if (sessionId) {
+        const session = await prisma.attendanceSession.findFirst({
+          where: { id: sessionId },
+        });
+        if (session) classroomId = session.classroomId;
+        else return res.status(404).json({ error: "Sessão não encontrada" });
+      }
+    }
+
+    if (!classroomId) {
+      const assessmentId = explicitAssessmentId || routeId;
+      if (assessmentId) {
+        const assessment = await prisma.assessment.findFirst({
+          where: { id: assessmentId },
+        });
+        if (assessment) classroomId = assessment.classroomId;
+      }
+    }
+
+    if (!classroomId && enrollmentId) {
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { id: enrollmentId },
+        select: { classroomId: true },
       });
-      if (session) classroomId = session.classroomId;
-      else return res.status(404).json({ error: "Sessão não encontrada" });
-    } else if (assessmentId) {
-      const assessment = await prisma.assessment.findFirst({
-        where: { id: assessmentId },
-      });
-      if (assessment) classroomId = assessment.classroomId;
-      else return res.status(404).json({ error: "Avaliação não encontrada" });
+      if (enrollment) classroomId = enrollment.classroomId;
     }
   }
   if (!classroomId) return next();

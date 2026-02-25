@@ -6,9 +6,28 @@ import * as service from "./students.service";
 import getParam from "../../utils/getParam";
 import { randomUUID } from "crypto";
 import { prisma } from "../../config/prisma";
+import { cleanCpf, isValidCpf } from "../../utils/cpf";
+
+function stripCpfDeep(student: any) {
+  if (!student || typeof student !== "object") return student;
+  try {
+    delete student.cpf;
+    if (Array.isArray(student.guardians)) {
+      for (const g of student.guardians) {
+        const gp = g?.guardian?.guardianProfile;
+        if (gp && typeof gp === "object") {
+          delete gp.cpf;
+        }
+      }
+    }
+  } catch {}
+  return student;
+}
 
 export async function createStudent(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const createdById = req.user!.id;
   const {
     name,
@@ -32,6 +51,9 @@ export async function createStudent(req: Request, res: Response) {
   } = req.body;
 
   if (!name) return res.status(400).json({ error: "name é obrigatório" });
+  if (cpf && !isValidCpf(cpf)) {
+    return res.status(400).json({ error: "CPF inválido" });
+  }
 
   try {
     const tempPassword = generateTempPassword();
@@ -53,7 +75,7 @@ export async function createStudent(req: Request, res: Response) {
         schoolId,
         name,
         socialName: socialName ?? null,
-        cpf: cpf ?? null,
+        cpf: cpf ? cleanCpf(cpf) : null,
         rg: rg ?? null,
         birthCertificate: birthCertificate ?? null,
         birthDate: birthDate ? new Date(birthDate) : null,
@@ -91,13 +113,64 @@ export async function listStudents(req: Request, res: Response) {
   const skip = (page - 1) * limit;
   const name = req.query.name ? String(req.query.name) : undefined;
   const status = req.query.status ? String(req.query.status) : undefined;
+  const requester = req.user!;
+  const canSeeCpf = requester.role === "SECRETARY";
+
+  if (requester.role === "TEACHER") {
+    const links = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        dateTo: null,
+        ...(requester.schoolId ? { schoolId: requester.schoolId } : {}),
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = links.map((l) => l.classroomId);
+    if (classroomIds.length === 0) {
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    }
+
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        classroomId: { in: classroomIds },
+        status: "ATIVA",
+        ...(requester.schoolId ? { schoolId: requester.schoolId } : {}),
+      },
+      select: { studentId: true },
+    });
+    const studentIds = Array.from(
+      new Set(enrollments.map((e) => e.studentId)),
+    );
+    if (studentIds.length === 0) {
+      return res.json({ data: [], meta: { total: 0, page, limit } });
+    }
+
+    const [items, total] = await Promise.all([
+      service.findStudents(schoolId, name, status, skip, limit, studentIds),
+      service.countStudents(schoolId, name, status, studentIds),
+    ]);
+
+    const data = canSeeCpf
+      ? items
+      : (items ?? []).map((s: any) => {
+          const { maskedCpf, ...rest } = s;
+          return rest;
+        });
+    return res.json({ data, meta: { total, page, limit } });
+  }
 
   const [items, total] = await Promise.all([
     service.findStudents(schoolId, name, status, skip, limit),
     service.countStudents(schoolId, name, status),
   ]);
 
-  return res.json({ data: items, meta: { total, page, limit } });
+  const data = canSeeCpf
+    ? items
+    : (items ?? []).map((s: any) => {
+        const { maskedCpf, ...rest } = s;
+        return rest;
+      });
+  return res.json({ data, meta: { total, page, limit } });
 }
 
 export async function getStudent(req: Request, res: Response) {
@@ -106,6 +179,52 @@ export async function getStudent(req: Request, res: Response) {
 
   const student = await service.findStudentById(id, schoolId);
   if (!student) return res.status(404).json({ error: "Aluno não encontrado" });
+  const requester = req.user!;
+  const canSeeCpf = requester.role === "SECRETARY";
+
+  if (requester.role === "TEACHER") {
+    const links = await prisma.classroomTeacher.findMany({
+      where: {
+        teacherId: requester.id,
+        dateTo: null,
+        ...(requester.schoolId ? { schoolId: requester.schoolId } : {}),
+      },
+      select: { classroomId: true },
+    });
+    const classroomIds = links.map((l) => l.classroomId);
+
+    if (classroomIds.length === 0) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    const activeEnrollment = await prisma.enrollment.findFirst({
+      where: {
+        studentId: id,
+        classroomId: { in: classroomIds },
+        status: "ATIVA",
+        ...(requester.schoolId ? { schoolId: requester.schoolId } : {}),
+      },
+    });
+
+    if (!activeEnrollment) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+  }
+
+  if (!canSeeCpf) {
+    stripCpfDeep(student);
+  } else {
+    // Mesmo com permissão para CPF do aluno, nunca retornar CPF de responsáveis
+    try {
+      if (Array.isArray(student.guardians)) {
+        for (const g of student.guardians) {
+          const gp = g?.guardian?.guardianProfile;
+          if (gp && typeof gp === "object") delete gp.cpf;
+        }
+      }
+    } catch {}
+  }
+
   return res.json(student);
 }
 
@@ -138,10 +257,14 @@ export async function updateStudent(req: Request, res: Response) {
   const existing = await service.findStudentById(id, schoolId);
   if (!existing) return res.status(404).json({ error: "Aluno não encontrado" });
 
+  if (cpf && !isValidCpf(cpf)) {
+    return res.status(400).json({ error: "CPF inválido" });
+  }
+
   const updated = await service.updateStudentById(id, {
     name: name ?? undefined,
     socialName: socialName !== undefined ? socialName || null : undefined,
-    cpf: cpf !== undefined ? cpf || null : undefined,
+    cpf: cpf !== undefined ? (cpf ? cleanCpf(cpf) : null) : undefined,
     rg: rg !== undefined ? rg || null : undefined,
     birthCertificate:
       birthCertificate !== undefined ? birthCertificate || null : undefined,
@@ -392,6 +515,14 @@ export async function listStudentGuardians(req: Request, res: Response) {
     },
     orderBy: { createdAt: "asc" },
   });
+
+  // Nunca retornar CPF de responsável (nem mascarado) via este endpoint
+  try {
+    for (const link of guardians as any[]) {
+      const gp = link?.guardian?.guardianProfile;
+      if (gp && typeof gp === "object") delete gp.cpf;
+    }
+  } catch {}
 
   return res.json({ data: guardians });
 }

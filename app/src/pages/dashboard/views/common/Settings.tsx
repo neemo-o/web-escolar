@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../../../../contexts/AuthContext";
+import api from "../../../../utils/api";
 import {
   PageShell,
   Card,
@@ -107,7 +108,7 @@ const LANG_OPTIONS = [
 ];
 
 export default function Settings() {
-  const { user, school, logout } = useAuth();
+  const { user, school, logout, refreshSchool } = useAuth();
   const role = user?.role || "";
 
   // preferências locais (sem backend, salvas em localStorage)
@@ -155,7 +156,33 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 3000);
   }
 
-  const isSecretary = role === "SECRETARY" || role === "ADMIN_GLOBAL";
+  const isSecretary = role === "SECRETARY";
+
+  const [theme, setTheme] = useState(() => ({
+    primaryColor: school?.config?.primaryColor || "#0891b2",
+    secondaryColor: school?.config?.secondaryColor || "#0e7490",
+  }));
+  const [themeSaving, setThemeSaving] = useState(false);
+
+  async function saveTheme() {
+    if (!isSecretary) return;
+    setThemeSaving(true);
+    try {
+      await api.fetchJson("/schools/me/config", {
+        method: "PATCH",
+        body: JSON.stringify({
+          primaryColor: theme.primaryColor,
+          secondaryColor: theme.secondaryColor,
+        }),
+      });
+      toast("Tema da escola atualizado!");
+      await refreshSchool();
+    } catch (e: any) {
+      toast(e?.message || "Erro ao salvar tema", "error");
+    } finally {
+      setThemeSaving(false);
+    }
+  }
 
   return (
     <PageShell
@@ -337,6 +364,87 @@ export default function Settings() {
           )}
         </div>
       </Card>
+
+      {/* Tema global da escola */}
+      {isSecretary && (
+        <Card>
+          <SectionHeader
+            title="Tema da escola"
+            description="Defina as cores principais usadas no sistema (por escola)."
+          />
+          <div style={{ padding: "16px 20px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: 6,
+                  }}
+                >
+                  Cor principal
+                </div>
+                <input
+                  type="color"
+                  value={theme.primaryColor}
+                  onChange={(e) =>
+                    setTheme((t) => ({ ...t, primaryColor: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 40,
+                    borderRadius: 10,
+                    border: "1.5px solid #e2e8f0",
+                    background: "#fff",
+                    padding: 4,
+                    cursor: "pointer",
+                  }}
+                />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: 6,
+                  }}
+                >
+                  Cor do sidebar
+                </div>
+                <input
+                  type="color"
+                  value={theme.secondaryColor}
+                  onChange={(e) =>
+                    setTheme((t) => ({ ...t, secondaryColor: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 40,
+                    borderRadius: 10,
+                    border: "1.5px solid #e2e8f0",
+                    background: "#fff",
+                    padding: 4,
+                    cursor: "pointer",
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+              <PrimaryButton onClick={saveTheme} loading={themeSaving}>
+                Salvar tema
+              </PrimaryButton>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Conta */}
       <Card>

@@ -6,6 +6,8 @@ import * as service from "./classroom-subjects.service";
 
 export async function addSubjectToClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const classroomId = getParam(req, "classroomId");
   const { subjectId, workloadHours, isRequired, dateFrom } = req.body;
 

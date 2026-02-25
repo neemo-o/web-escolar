@@ -80,7 +80,7 @@ export default function Sidebar({
         display: "flex",
         flexDirection: "column",
         background:
-          "linear-gradient(180deg, #4f46e5 0%, #7c3aed 55%, #6d28d9 100%)",
+          "linear-gradient(180deg, var(--school-sidebar, #4f46e5) 0%, var(--school-primary, #0891b2) 100%)",
         overflowY: "auto",
         overflowX: "hidden",
       }}

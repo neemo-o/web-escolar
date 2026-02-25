@@ -16,9 +16,6 @@ export function requireTenantMatch(
   return next();
 }
 
-export function getSchoolId(req: Request): string {
-  if (!req.user?.schoolId) {
-    throw new Error("schoolId não disponível no contexto do usuário");
-  }
-  return req.user.schoolId;
+export function getSchoolId(req: Request): string | null {
+  return req.user?.schoolId ?? null;
 }

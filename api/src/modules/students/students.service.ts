@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { maskCpf } from "../../utils/cpf";
 
 export const createStudentWithUser = async (data: { user: any; student: any; createdById?: string }) =>
   prisma.$transaction(async (tx) => {
@@ -60,12 +61,16 @@ export const findStudents = (
   status?: string,
   skip = 0,
   take = 20,
+  studentIds?: string[],
 ) =>
   prisma.$transaction(async (tx) => {
     const rawStudents = await tx.student.findMany({
       where: {
         schoolId,
         deletedAt: null,
+        ...(studentIds && studentIds.length
+          ? { id: { in: studentIds } }
+          : {}),
         ...(name ? { name: { contains: name, mode: "insensitive" } } : {}),
         ...(status ? { status: status as any } : {}),
       },
@@ -123,7 +128,7 @@ export const findStudents = (
     });
 
     const students = rawStudents.map((s) => {
-      const maskedCpf = s.cpf ? s.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : null;
+      const maskedCpf = maskCpf(s.cpf);
       const { cpf, ...rest } = s;
       return { ...rest, maskedCpf };
     });
@@ -131,11 +136,17 @@ export const findStudents = (
     return students;
   });
 
-export const countStudents = (schoolId: string, name?: string, status?: string) =>
+export const countStudents = (
+  schoolId: string,
+  name?: string,
+  status?: string,
+  studentIds?: string[],
+) =>
   prisma.student.count({
     where: {
       schoolId,
       deletedAt: null,
+      ...(studentIds && studentIds.length ? { id: { in: studentIds } } : {}),
       ...(name ? { name: { contains: name, mode: "insensitive" } } : {}),
       ...(status ? { status: status as any } : {}),
     },

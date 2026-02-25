@@ -9,6 +9,10 @@ export const findActiveTeachersByClassroom = (
 ) =>
   prisma.classroomTeacher.findMany({
     where: { classroomId, schoolId, dateTo: null },
+    include: {
+      teacher: { select: { id: true, name: true, email: true } },
+      subject: { select: { id: true, name: true } },
+    },
   });
 
 export const findClassroomTeacherById = (id: string, classroomId: string) =>

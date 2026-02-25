@@ -80,7 +80,6 @@ export default function TeacherProfileModal({
   const [err, setErr] = useState("");
   const [form, setForm] = useState({
     internalCode: "",
-    cpf: "",
     rg: "",
     birthDate: "",
     gender: "",
@@ -113,7 +112,6 @@ export default function TeacherProfileModal({
         if (p && p.id) {
           setForm({
             internalCode: p.internalCode ?? "",
-            cpf: p.cpf ?? "",
             rg: p.rg ?? "",
             birthDate: p.birthDate ? p.birthDate.split("T")[0] : "",
             gender: p.gender ?? "",
@@ -188,18 +186,6 @@ export default function TeacherProfileModal({
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
           >
-            <FormField label="CPF">
-              <div style={{ marginBottom: 8 }}>
-                <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                  Visualização: <strong>{form.cpf ? form.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4') : 'Não informado'}</strong>
-                </p>
-              </div>
-              <Input
-                value={form.cpf}
-                onChange={(v) => setF({ cpf: v })}
-                placeholder="000.000.000-00"
-              />
-            </FormField>
             <FormField label="RG">
               <Input value={form.rg} onChange={(v) => setF({ rg: v })} />
             </FormField>

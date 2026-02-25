@@ -6,6 +6,8 @@ import * as service from "./classroom-teachers.service";
 
 export async function addTeacherToClassroom(req: Request, res: Response) {
   const schoolId = getSchoolId(req);
+  if (!schoolId)
+    return res.status(403).json({ error: "Escola não associada" });
   const classroomId = getParam(req, "classroomId");
   const { teacherId, subjectId, dateFrom } = req.body;
 

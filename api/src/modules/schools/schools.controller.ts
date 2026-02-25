@@ -94,6 +94,36 @@ export async function getSchool(req: Request, res: Response) {
   return res.json(school);
 }
 
+export async function updateMySchoolConfig(req: Request, res: Response) {
+  const requester = req.user;
+  if (!requester) return res.status(401).json({ error: "Não autenticado" });
+  if (requester.role !== "SECRETARY") {
+    return res
+      .status(403)
+      .json({ error: "Apenas SECRETARY pode alterar o tema da escola" });
+  }
+  const schoolId = requester.schoolId;
+  if (!schoolId)
+    return res.status(403).json({ error: "Usuário não pertence a uma escola" });
+
+  const { primaryColor, secondaryColor } = req.body;
+
+  const config = await prisma.schoolConfig.findUnique({
+    where: { schoolId },
+  });
+  if (!config) return res.status(404).json({ error: "Config não encontrada" });
+
+  const updated = await prisma.schoolConfig.update({
+    where: { schoolId },
+    data: {
+      primaryColor: primaryColor ?? undefined,
+      secondaryColor: secondaryColor ?? undefined,
+    },
+  });
+
+  return res.json(updated);
+}
+
 export async function updateSchool(req: Request, res: Response) {
   const id = getParam(req, "id");
   const { name, cnpj, slug } = req.body;

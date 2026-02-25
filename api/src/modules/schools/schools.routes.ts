@@ -9,6 +9,7 @@ import {
   activateSchool,
   deactivateSchool,
   getMySchool,
+  updateMySchoolConfig,
 } from "./schools.controller";
 
 const router = Router();
@@ -19,6 +20,12 @@ router.get("/public/schools", listPublicSchools);
 
 // Get the authenticated user's school
 router.get("/schools/me", authenticate, getMySchool);
+router.patch(
+  "/schools/me/config",
+  authenticate,
+  authorize(["SECRETARY"]),
+  updateMySchoolConfig,
+);
 
 router.post(
   "/schools",
