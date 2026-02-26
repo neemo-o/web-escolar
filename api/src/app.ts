@@ -19,6 +19,8 @@ import gradesRoutes from "./modules/grades/grades.routes";
 import attendanceRoutes from "./modules/attendance/attendance.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import schedulesRoutes from "./modules/schedules/schedules.routes";
+import timeBlocksRoutes from "./modules/time-blocks/time-blocks.routes";
+import roomsRoutes from "./modules/rooms/rooms.routes";
 import { authenticate } from "./middlewares/authenticate";
 import { requireActiveSchool } from "./middlewares/requireActiveSchool";
 import { requireTenantMatch } from "./middlewares/tenant";
@@ -63,6 +65,8 @@ app.use(profileRoutes);
 app.use(usersRoutes);
 app.use(notificationsRoutes);
 app.use(schedulesRoutes);
+app.use(timeBlocksRoutes);
+app.use(roomsRoutes);
 
 // Global error handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

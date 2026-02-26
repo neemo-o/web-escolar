@@ -1,21 +1,5 @@
 import { Request, Response } from "express";
-import { authenticate } from "../../middlewares/authenticate";
-import { authorize } from "../../middlewares/authorize";
 import { schedulesService } from "./schedules.service";
-
-// Middleware wrappers
-const authenticateMiddleware = authenticate;
-const authorizeMiddleware = authorize;
-
-// Middleware that adds auth to controller functions
-const auth = [
-  authenticateMiddleware,
-  authorizeMiddleware(["SECRETARY", "TEACHER"]),
-] as any;
-const authWrite = [
-  authenticateMiddleware,
-  authorizeMiddleware(["SECRETARY"]),
-] as any;
 
 // GET /schedules - List all schedules
 export const list = async (req: Request, res: Response) => {
@@ -41,32 +25,7 @@ export const list = async (req: Request, res: Response) => {
       schedules = await schedulesService.findAll(schoolId);
     }
 
-    // Get teachers for each schedule
-    const { prisma } = await import("../../config/prisma");
-    const schedulesWithTeachers = await Promise.all(
-      schedules.map(async (schedule: any) => {
-        const classroomTeacher = await prisma.classroomTeacher.findFirst({
-          where: {
-            classroomId: schedule.classroomId,
-            subjectId: schedule.subjectId,
-            dateFrom: { lte: new Date() },
-            OR: [{ dateTo: null }, { dateTo: { gte: new Date() } }],
-          },
-          include: {
-            teacher: {
-              select: { id: true, name: true },
-            },
-          },
-        });
-
-        return {
-          ...schedule,
-          teacher: classroomTeacher?.teacher || null,
-        };
-      }),
-    );
-
-    res.json(schedulesWithTeachers);
+    res.json(schedules);
   } catch (error) {
     console.error("Error fetching schedules:", error);
     res.status(500).json({ message: "Erro ao buscar horários" });
@@ -77,22 +36,26 @@ export const list = async (req: Request, res: Response) => {
 export const create = async (req: Request, res: Response) => {
   try {
     const schoolId = (req as any).user?.schoolId;
-    const { classroomId, subjectId, dayOfWeek, startTime, endTime, room } =
-      req.body;
+    const {
+      classroomId,
+      subjectId,
+      teacherId,
+      roomId,
+      timeBlockId,
+      dayOfWeek,
+    } = req.body;
 
     if (!schoolId) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    if (
-      !classroomId ||
-      !subjectId ||
-      dayOfWeek === undefined ||
-      !startTime ||
-      !endTime
-    ) {
-      res.status(400).json({ message: "Todos os campos são obrigatórios" });
+    if (!classroomId || !subjectId || dayOfWeek === undefined || !timeBlockId) {
+      res
+        .status(400)
+        .json({
+          message: "Todos os campos obrigatórios devem ser preenchidos",
+        });
       return;
     }
 
@@ -100,10 +63,10 @@ export const create = async (req: Request, res: Response) => {
       schoolId,
       classroomId,
       subjectId,
+      teacherId,
+      roomId,
+      timeBlockId,
       dayOfWeek,
-      startTime,
-      endTime,
-      room,
     });
 
     res.status(201).json(schedule);
@@ -124,14 +87,14 @@ export const create = async (req: Request, res: Response) => {
 export const update = async (req: Request, res: Response) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const { subjectId, dayOfWeek, startTime, endTime, room } = req.body;
+    const { subjectId, teacherId, roomId, timeBlockId, dayOfWeek } = req.body;
 
     const schedule = await schedulesService.update(id, {
       subjectId,
+      teacherId,
+      roomId,
+      timeBlockId,
       dayOfWeek,
-      startTime,
-      endTime,
-      room,
     });
 
     res.json(schedule);
@@ -160,10 +123,43 @@ export const remove = async (req: Request, res: Response) => {
   }
 };
 
+// GET /schedules/by-block - Get schedules by day and time block
+export const findByBlock = async (req: Request, res: Response) => {
+  try {
+    const schoolId = (req as any).user?.schoolId;
+    const dayOfWeek = parseInt(req.query.dayOfWeek as string);
+    const timeBlockId = req.query.timeBlockId as string;
+
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    if (isNaN(dayOfWeek) || !timeBlockId) {
+      res
+        .status(400)
+        .json({ message: "Dia da semana e bloco de horário são obrigatórios" });
+      return;
+    }
+
+    const schedules = await schedulesService.findByDayAndBlock(
+      schoolId,
+      dayOfWeek,
+      timeBlockId,
+    );
+
+    res.json(schedules);
+  } catch (error) {
+    console.error("Error fetching schedules by block:", error);
+    res.status(500).json({ message: "Erro ao buscar horários" });
+  }
+};
+
 // Default export for backward compatibility
 export default {
   list,
   create,
   update,
   delete: remove,
+  findByBlock,
 };

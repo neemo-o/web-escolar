@@ -140,6 +140,8 @@ model School {
   users              User[]
   enrollments        Enrollment[]
   notifications      Notification[]
+  timeBlocks         TimeBlock[]
+  rooms              Room[]
 
   @@map("schools")
 }
@@ -218,6 +220,7 @@ model User {
   enrollmentHistories             EnrollmentHistory[]  @relation("MovementCreatedBy")
   financialResponsibleEnrollments Enrollment[]         @relation("EnrollmentFinancialResponsible")
   notifications                   Notification[]
+  schedulesAsTeacher              Schedule[]           @relation("ScheduleTeacher")
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -444,25 +447,77 @@ model ClassroomTeacher {
   @@map("classroom_teachers")
 }
 
-model Schedule {
-  id          String   @id @default(uuid()) @db.Uuid
-  schoolId    String   @db.Uuid
-  classroomId String   @db.Uuid
-  subjectId   String   @db.Uuid
-  dayOfWeek   Int
-  startTime   DateTime @db.Time()
-  endTime     DateTime @db.Time()
-  room        String?  @db.VarChar(50) // Sala - para expansões futuras
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// =============================================================================
+// BLOCOS DE HORÁRIO E SALAS
+// =============================================================================
 
-  classroom Classroom @relation(fields: [classroomId], references: [id])
-  subject   Subject   @relation(fields: [subjectId], references: [id])
+model TimeBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @db.Uuid
+  name      String   @db.VarChar(50)
+  startTime DateTime @db.Time()
+  endTime   DateTime @db.Time()
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  schedules  Schedule[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, order])
+  @@index([schoolId, active])
+  @@map("time_blocks")
+}
+
+model Room {
+  id        String    @id @default(uuid()) @db.Uuid
+  schoolId  String    @db.Uuid
+  name      String    @db.VarChar(100)
+  capacity  Int?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  school    School     @relation(fields: [schoolId], references: [id])
+  schedules Schedule[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, active])
+  @@map("rooms")
+}
+
+// =============================================================================
+// HORÁRIOS/AULAS
+// =============================================================================
+
+model Schedule {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  classroomId  String   @db.Uuid
+  subjectId    String   @db.Uuid
+  teacherId    String?  @db.Uuid
+  roomId       String?  @db.Uuid
+  timeBlockId  String?  @db.Uuid
+  dayOfWeek    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  classroom  Classroom  @relation(fields: [classroomId], references: [id])
+  subject    Subject    @relation(fields: [subjectId], references: [id])
+  teacher    User?      @relation("ScheduleTeacher", fields: [teacherId], references: [id])
+  room       Room?      @relation(fields: [roomId], references: [id])
+  timeBlock  TimeBlock? @relation(fields: [timeBlockId], references: [id])
 
   // Índices para buscas eficientes
   @@index([schoolId, classroomId])
   @@index([schoolId, dayOfWeek])
-  @@unique([classroomId, dayOfWeek, startTime]) // Não permite conflito de horário na mesma turma
+  @@index([schoolId, timeBlockId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, roomId])
+  @@unique([classroomId, dayOfWeek, timeBlockId]) // Não permite conflito de horário na mesma turma
   @@map("schedules")
 }
 

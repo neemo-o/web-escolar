@@ -1023,6 +1023,36 @@ export function toast(
   } catch {}
 }
 
+// SecondaryButton - alias for Button with secondary variant
+export function SecondaryButton({
+  onClick,
+  disabled,
+  loading,
+  children,
+  type = "button",
+  style,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  children: React.ReactNode;
+  type?: "button" | "submit";
+  style?: React.CSSProperties;
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      loading={loading}
+      type={type}
+      variant="secondary"
+      style={style}
+    >
+      {children}
+    </Button>
+  );
+}
+
 // Button component for general use
 export function Button({
   onClick,
