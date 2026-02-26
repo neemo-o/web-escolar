@@ -476,6 +476,22 @@ export async function generateStructuredPdf(req: Request, res: Response) {
   if (!templateType)
     return res.status(400).json({ error: "templateType é obrigatório" });
 
+  if (enrollmentId) {
+    const enrollment = await prisma.enrollment.findFirst({
+      where: { id: enrollmentId, schoolId },
+    });
+    if (!enrollment)
+      return res.status(404).json({ error: "Matrícula não encontrada" });
+  }
+
+  if (studentId) {
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, schoolId },
+    });
+    if (!student)
+      return res.status(404).json({ error: "Aluno não encontrado" });
+  }
+
   const fakeDocId = `preview-${Date.now()}`;
 
   try {
@@ -542,6 +558,27 @@ async function renderFreeDocument(
   schoolId: string,
   docId: string,
 ) {
+  const plainBody = stripHtml(item.bodySnapshot ?? "").trim();
+  if (!plainBody) {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${sanitizeFilename(item.title)}.pdf"`,
+    );
+    doc.pipe(res);
+    doc
+      .font("Helvetica")
+      .fontSize(12)
+      .fillColor("#6b7280")
+      .text("Este documento não possui conteúdo.", 50, 280, {
+        align: "center",
+        width: 495,
+      });
+    doc.end();
+    return;
+  }
+
   const schoolCfg = await loadSchoolConfig(schoolId);
   const showLogo = item.template?.showLogo ?? true;
 

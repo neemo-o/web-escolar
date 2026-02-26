@@ -863,6 +863,7 @@ function TemplatesTab() {
   const [items, setItems] = useState<Template[]>([]);
   const [loading, setLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const [modal, setModal] = useState<"create" | "edit" | "delete" | null>(null);
   const [selected, setSelected] = useState<Template | null>(null);
   const [form, setForm] = useState<any>({
@@ -885,7 +886,8 @@ function TemplatesTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ active: "true" });
+      const params = new URLSearchParams();
+      if (!showInactive) params.set("active", "true");
       if (typeFilter) params.set("templateType", typeFilter);
       const res = await api.fetchJson(`/document-templates?${params}`);
       setItems(res?.data ?? []);
@@ -894,7 +896,7 @@ function TemplatesTab() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [typeFilter, showInactive]);
 
   useEffect(() => {
     load();
@@ -1012,9 +1014,11 @@ function TemplatesTab() {
     { key: "name", label: "Nome" },
     { key: "type", label: "Tipo" },
     { key: "cat", label: "Categoria" },
+    { key: "status", label: "Status" },
     { key: "logo", label: "Logo" },
     { key: "actions", label: "" },
   ];
+
   const rows = items.map((item) => [
     <span style={{ fontWeight: 600, fontSize: 13 }}>{item.name}</span>,
     <span
@@ -1037,11 +1041,17 @@ function TemplatesTab() {
       label={CATEGORY_LABELS[item.category] ?? item.category}
       color={CATEGORY_COLORS[item.category] ?? "gray"}
     />,
+    <StatusBadge
+      status={item.active ? "active" : "inactive"}
+      label={item.active ? "Ativo" : "Inativo"}
+      color={item.active ? "green" : "gray"}
+    />,
     <span
       style={{ fontSize: 12, color: item.showLogo ? "#059669" : "#9ca3af" }}
     >
       {item.showLogo ? "✓ Sim" : "—"}
     </span>,
+
     <div style={{ display: "flex", gap: 4 }}>
       <IconButton onClick={() => openEdit(item)} title="Editar">
         <svg
@@ -1093,14 +1103,33 @@ function TemplatesTab() {
           gap: 10,
         }}
       >
-        <SelectFilter
-          value={typeFilter}
-          onChange={setTypeFilter}
-          options={[
-            { value: "", label: "Todos os tipos" },
-            ...TEMPLATE_TYPE_OPTIONS,
-          ]}
-        />
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <SelectFilter
+            value={typeFilter}
+            onChange={setTypeFilter}
+            options={[
+              { value: "", label: "Todos os tipos" },
+              ...TEMPLATE_TYPE_OPTIONS,
+            ]}
+          />
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+            />
+            Mostrar inativos
+          </label>
+        </div>
         <PrimaryButton onClick={openCreate}>+ Novo template</PrimaryButton>
       </div>
       <Card>
@@ -1532,8 +1561,22 @@ function IssuedTab() {
   }
 
   function applyTemplate(templateId: string) {
+    if (!templateId) {
+      setForm((prev: any) => ({
+        ...prev,
+        templateId: "",
+        bodySnapshot: "",
+        headerSnapshot: "",
+        footerSnapshot: "",
+        category: "OUTRO",
+        structuredConfig: {},
+      }));
+      setResolvedBody("");
+      return;
+    }
     const t = templates.find((x) => x.id === templateId);
     if (!t) return;
+    const isStructured = STRUCTURED_TYPES.includes(t.templateType);
     setForm((prev: any) => ({
       ...prev,
       templateId,
@@ -1544,6 +1587,20 @@ function IssuedTab() {
       category: t.category,
       structuredConfig: t.structuredConfig ?? defaultConfig(t.templateType),
     }));
+    if (!isStructured) {
+      scheduleResolve({
+        ...form,
+        templateId,
+        title: form.title || t.name,
+        bodySnapshot: t.templateType === "FREE" ? t.bodyTemplate : "",
+        headerSnapshot: t.headerHtml || "",
+        footerSnapshot: t.footerHtml || "",
+        category: t.category,
+        structuredConfig: t.structuredConfig ?? defaultConfig(t.templateType),
+      });
+    } else {
+      setResolvedBody("");
+    }
   }
 
   function openCreate() {
@@ -1592,6 +1649,9 @@ function IssuedTab() {
       setFormError("Selecione um aluno para este tipo de documento.");
       return;
     }
+    const currentTemplate = templates.find((t) => t.id === form.templateId);
+    const currentTemplateType = currentTemplate?.templateType ?? "FREE";
+    const currentIsStructured = STRUCTURED_TYPES.includes(currentTemplateType);
     setSaving(true);
     setFormError("");
     try {
@@ -1607,7 +1667,9 @@ function IssuedTab() {
           headerSnapshot: form.headerSnapshot || undefined,
           footerSnapshot: form.footerSnapshot || undefined,
           notes: form.notes || undefined,
-          structuredPayload: isStructured ? form.structuredConfig : undefined,
+          structuredPayload: currentIsStructured
+            ? form.structuredConfig
+            : undefined,
         }),
       });
       toast("Documento criado!");
