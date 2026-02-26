@@ -39,8 +39,16 @@ export const listAll = async (req: Request, res: Response) => {
 // GET /time-blocks/:id - Get a specific time block
 export const getById = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const timeBlock = await timeBlockService.findById(id);
+
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #9: Validate schoolId before fetching
+    const timeBlock = await timeBlockService.findById(id, schoolId);
 
     if (!timeBlock) {
       res.status(404).json({ message: "Bloco de horário não encontrado" });
@@ -90,10 +98,17 @@ export const create = async (req: Request, res: Response) => {
 // PATCH /time-blocks/:id - Update a time block
 export const update = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { name, startTime, endTime, order, active } = req.body;
 
-    const timeBlock = await timeBlockService.update(id, {
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #4: Validate schoolId before updating
+    const timeBlock = await timeBlockService.update(id, schoolId, {
       name,
       startTime,
       endTime,
@@ -101,9 +116,18 @@ export const update = async (req: Request, res: Response) => {
       active,
     });
 
+    if (!timeBlock) {
+      res.status(404).json({ message: "Bloco de horário não encontrado" });
+      return;
+    }
+
     res.json(timeBlock);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating time block:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     res.status(500).json({ message: "Erro ao atualizar bloco de horário" });
   }
 };
@@ -111,10 +135,17 @@ export const update = async (req: Request, res: Response) => {
 // DELETE /time-blocks/:id - Deactivate a time block
 export const remove = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #4: Validate schoolId before deleting
     // Check if block has schedules
-    const hasSchedules = await timeBlockService.hasSchedules(id);
+    const hasSchedules = await timeBlockService.hasSchedules(id, schoolId);
     if (hasSchedules) {
       res.status(400).json({
         message:
@@ -123,10 +154,18 @@ export const remove = async (req: Request, res: Response) => {
       return;
     }
 
-    await timeBlockService.delete(id);
+    const deleted = await timeBlockService.delete(id, schoolId);
+    if (!deleted) {
+      res.status(404).json({ message: "Bloco de horário não encontrado" });
+      return;
+    }
     res.status(204).send();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting time block:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     res.status(500).json({ message: "Erro ao desativar bloco de horário" });
   }
 };
@@ -147,6 +186,7 @@ export const reorder = async (req: Request, res: Response) => {
       return;
     }
 
+    // FIX #6: Pass schoolId to reorder
     await timeBlockService.reorder(schoolId, orderedIds);
     res.json({ message: "Blocos de horário reordenados com sucesso" });
   } catch (error) {

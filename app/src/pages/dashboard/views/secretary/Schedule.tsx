@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import api from "../../../../utils/api";
+import { useAuth } from "../../../../contexts/AuthContext";
 import {
   PageShell,
   Card,
@@ -105,6 +106,11 @@ const selectStyle: React.CSSProperties = {
 };
 
 export default function Schedule() {
+  const { user } = useAuth();
+  const isSecretary = user?.role === "SECRETARY";
+  const isTeacher = user?.role === "TEACHER";
+  const isReadOnly = isTeacher;
+
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -217,7 +223,23 @@ export default function Schedule() {
         params.append("gradeLevelId", selectedGradeLevel);
       }
       const res = await api.fetchJson(`/schedules?${params}`);
-      setSchedules(res?.data ?? res ?? []);
+      const schedulesData = res?.data ?? res ?? [];
+
+      // FIX #12: Warn about schedules without timeBlockId
+      const schedulesWithoutBlock = schedulesData.filter(
+        (s: Schedule) => !s.timeBlockId,
+      );
+      if (schedulesWithoutBlock.length > 0) {
+        console.warn(
+          `Found ${schedulesWithoutBlock.length} schedule(s) without timeBlockId`,
+        );
+        toast(
+          `${schedulesWithoutBlock.length} aula(s) não aparecem na grade por não ter bloco de horário vinculado`,
+          "warning",
+        );
+      }
+
+      setSchedules(schedulesData);
     } catch (e: any) {
       toast(e?.message || "Erro ao carregar horários", "error");
     } finally {
@@ -235,12 +257,8 @@ export default function Schedule() {
 
   function handleGradeLevelChange(value: string) {
     setSelectedGradeLevel(value);
-    const gradeClassrooms = classrooms.filter((c) => c.gradeLevelId === value);
-    if (gradeClassrooms.length > 0) {
-      setSelectedClassroom(gradeClassrooms[0].id);
-    } else {
-      setSelectedClassroom("");
-    }
+    // FIX #14: Don't automatically select first classroom - require explicit selection
+    setSelectedClassroom("");
   }
 
   // Simple schedule grid - no combining
@@ -296,8 +314,13 @@ export default function Schedule() {
   }
 
   async function handleCreate() {
+    // FIX #11: Require explicit classroom selection instead of silent fallback
     if (!selectedClassroom && !selectedGradeLevel) {
       toast("Selecione uma turma ou série primeiro", "error");
+      return;
+    }
+    if (!selectedClassroom) {
+      toast("Selecione uma turma explicitamente", "error");
       return;
     }
     if (!formData.subjectId || !formData.timeBlockId) {
@@ -307,9 +330,8 @@ export default function Schedule() {
 
     setSaving(true);
     try {
-      const classroomId = selectedClassroom || filteredClassrooms[0]?.id;
       await api.postJson("/schedules", {
-        classroomId,
+        classroomId: selectedClassroom,
         subjectId: formData.subjectId,
         teacherId: formData.teacherId || null,
         roomId: formData.roomId || null,
@@ -511,31 +533,37 @@ export default function Schedule() {
     [timeBlocks],
   );
 
+  // FIX #10: Only show write buttons for SECRETARY role
+  const canWrite = isSecretary;
+
   return (
     <PageShell
       title="Horário"
       description="Gerencie o calendário semanal de aulas por turma ou série."
     >
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          marginBottom: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <PrimaryButton
-          onClick={() => openCreateModal(1, activeTimeBlocks[0]?.id || "")}
+      {/* FIX #10: Only show write action buttons for SECRETARY */}
+      {canWrite && (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginBottom: 16,
+            flexWrap: "wrap",
+          }}
         >
-          + Criar Aula
-        </PrimaryButton>
-        <SecondaryButton onClick={openManageTimeBlocks}>
-          Gerenciar Horários
-        </SecondaryButton>
-        <SecondaryButton onClick={openManageRooms}>
-          Gerenciar Salas
-        </SecondaryButton>
-      </div>
+          <PrimaryButton
+            onClick={() => openCreateModal(1, activeTimeBlocks[0]?.id || "")}
+          >
+            + Criar Aula
+          </PrimaryButton>
+          <SecondaryButton onClick={openManageTimeBlocks}>
+            Gerenciar Horários
+          </SecondaryButton>
+          <SecondaryButton onClick={openManageRooms}>
+            Gerenciar Salas
+          </SecondaryButton>
+        </div>
+      )}
 
       <Card>
         <div
@@ -658,8 +686,9 @@ export default function Schedule() {
                       color: "#9ca3af",
                     }}
                   >
-                    Nenhum bloco de horário configurado. Clique em "Gerenciar
-                    Horários" para configurar.
+                    Nenhum bloco de horário configurado.
+                    {canWrite &&
+                      ' Clique em "Gerenciar Horários" para configurar.'}
                   </td>
                 </tr>
               ) : (
@@ -693,12 +722,14 @@ export default function Schedule() {
                             verticalAlign: "top",
                             minHeight: 50,
                             cursor:
-                              selectedClassroom || selectedGradeLevel
+                              canWrite &&
+                              (selectedClassroom || selectedGradeLevel)
                                 ? "pointer"
                                 : "default",
                           }}
                           onClick={() => {
                             if (
+                              canWrite &&
                               cellSchedules.length === 0 &&
                               (selectedClassroom || selectedGradeLevel)
                             ) {
@@ -719,7 +750,9 @@ export default function Schedule() {
                                   key={s.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    openEditModal(s);
+                                    if (canWrite) {
+                                      openEditModal(s);
+                                    }
                                   }}
                                   style={{
                                     padding: "6px 8px",
@@ -727,7 +760,7 @@ export default function Schedule() {
                                     background: getSubjectColor(s.subjectId),
                                     color: "#fff",
                                     fontSize: 11,
-                                    cursor: "pointer",
+                                    cursor: canWrite ? "pointer" : "default",
                                   }}
                                 >
                                   <div
@@ -782,339 +815,364 @@ export default function Schedule() {
         </div>
       </Card>
 
-      <Modal
-        open={modal === "create" || modal === "edit"}
-        onClose={() => setModal(null)}
-        title={modal === "create" ? "Criar Aula" : "Editar Aula"}
-      >
-        <FormField label="Disciplina" required>
-          <select
-            value={formData.subjectId}
-            onChange={(e) =>
-              setFormData((f) => ({ ...f, subjectId: e.target.value }))
-            }
-            style={selectStyle}
+      {/* Only show modals for write operations if canWrite */}
+      {canWrite && (
+        <>
+          <Modal
+            open={modal === "create" || modal === "edit"}
+            onClose={() => setModal(null)}
+            title={modal === "create" ? "Criar Aula" : "Editar Aula"}
           >
-            <option value="">Selecione...</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
+            <FormField label="Disciplina" required>
+              <select
+                value={formData.subjectId}
+                onChange={(e) =>
+                  setFormData((f) => ({ ...f, subjectId: e.target.value }))
+                }
+                style={selectStyle}
+              >
+                <option value="">Selecione...</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-        <FormField label="Professor">
-          <select
-            value={formData.teacherId}
-            onChange={(e) =>
-              setFormData((f) => ({ ...f, teacherId: e.target.value }))
-            }
-            style={selectStyle}
-          >
-            <option value="">Selecione...</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
+            <FormField label="Professor">
+              <select
+                value={formData.teacherId}
+                onChange={(e) =>
+                  setFormData((f) => ({ ...f, teacherId: e.target.value }))
+                }
+                style={selectStyle}
+              >
+                <option value="">Selecione...</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-        <FormField label="Sala">
-          <select
-            value={formData.roomId}
-            onChange={(e) =>
-              setFormData((f) => ({ ...f, roomId: e.target.value }))
-            }
-            style={selectStyle}
-          >
-            <option value="">Selecione...</option>
-            {rooms
-              .filter((r) => r.active)
-              .map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name} {r.capacity ? `(${r.capacity})` : ""}
-                </option>
-              ))}
-          </select>
-        </FormField>
+            <FormField label="Sala">
+              <select
+                value={formData.roomId}
+                onChange={(e) =>
+                  setFormData((f) => ({ ...f, roomId: e.target.value }))
+                }
+                style={selectStyle}
+              >
+                <option value="">Selecione...</option>
+                {rooms
+                  .filter((r) => r.active)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {r.capacity ? `(${r.capacity})` : ""}
+                    </option>
+                  ))}
+              </select>
+            </FormField>
 
-        <FormField label="Dia da Semana" required>
-          <select
-            value={formData.dayOfWeek}
-            onChange={(e) =>
-              setFormData((f) => ({ ...f, dayOfWeek: e.target.value }))
-            }
-            style={selectStyle}
-          >
-            {DAYS_TO_SHOW.map((d) => (
-              <option key={d} value={d}>
-                {DAY_LABELS[d]}
-              </option>
-            ))}
-          </select>
-        </FormField>
+            <FormField label="Dia da Semana" required>
+              <select
+                value={formData.dayOfWeek}
+                onChange={(e) =>
+                  setFormData((f) => ({ ...f, dayOfWeek: e.target.value }))
+                }
+                style={selectStyle}
+              >
+                {DAYS_TO_SHOW.map((d) => (
+                  <option key={d} value={d}>
+                    {DAY_LABELS[d]}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-        <FormField label="Bloco de Horário" required>
-          <select
-            value={formData.timeBlockId}
-            onChange={(e) =>
-              setFormData((f) => ({ ...f, timeBlockId: e.target.value }))
-            }
-            style={selectStyle}
-          >
-            <option value="">Selecione...</option>
-            {activeTimeBlocks.map((tb) => (
-              <option key={tb.id} value={tb.id}>
-                {tb.name} ({formatTime(tb.startTime)} - {formatTime(tb.endTime)}
-                )
-              </option>
-            ))}
-          </select>
-        </FormField>
+            <FormField label="Bloco de Horário" required>
+              <select
+                value={formData.timeBlockId}
+                onChange={(e) =>
+                  setFormData((f) => ({ ...f, timeBlockId: e.target.value }))
+                }
+                style={selectStyle}
+              >
+                <option value="">Selecione...</option>
+                {activeTimeBlocks.map((tb) => (
+                  <option key={tb.id} value={tb.id}>
+                    {tb.name} ({formatTime(tb.startTime)} -{" "}
+                    {formatTime(tb.endTime)})
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-        <ModalFooter>
-          {modal === "edit" && (
-            <div style={{ marginRight: "auto" }}>
+            <ModalFooter>
+              {modal === "edit" && (
+                <div style={{ marginRight: "auto" }}>
+                  <PrimaryButton
+                    variant="danger"
+                    onClick={handleDelete}
+                    loading={saving}
+                  >
+                    Excluir
+                  </PrimaryButton>
+                </div>
+              )}
+              <PrimaryButton variant="ghost" onClick={() => setModal(null)}>
+                Cancelar
+              </PrimaryButton>
               <PrimaryButton
-                variant="danger"
-                onClick={handleDelete}
+                onClick={modal === "create" ? handleCreate : handleUpdate}
                 loading={saving}
               >
-                Excluir
+                {modal === "create" ? "Criar" : "Salvar"}
               </PrimaryButton>
-            </div>
-          )}
-          <PrimaryButton variant="ghost" onClick={() => setModal(null)}>
-            Cancelar
-          </PrimaryButton>
-          <PrimaryButton
-            onClick={modal === "create" ? handleCreate : handleUpdate}
-            loading={saving}
+            </ModalFooter>
+          </Modal>
+
+          <Modal
+            open={modal === "manageTimeBlocks"}
+            onClose={() => setModal(null)}
+            title="Gerenciar Horários"
           >
-            {modal === "create" ? "Criar" : "Salvar"}
-          </PrimaryButton>
-        </ModalFooter>
-      </Modal>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="Nome (ex: 1º horário)"
+                  value={
+                    editingTimeBlock ? timeBlockForm.name : timeBlockForm.name
+                  }
+                  onChange={(e) =>
+                    setTimeBlockForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <input
+                  type="time"
+                  value={timeBlockForm.startTime}
+                  onChange={(e) =>
+                    setTimeBlockForm((f) => ({
+                      ...f,
+                      startTime: e.target.value,
+                    }))
+                  }
+                  style={{ width: 100 }}
+                />
+                <input
+                  type="time"
+                  value={timeBlockForm.endTime}
+                  onChange={(e) =>
+                    setTimeBlockForm((f) => ({ ...f, endTime: e.target.value }))
+                  }
+                  style={{ width: 100 }}
+                />
+                <PrimaryButton
+                  onClick={
+                    editingTimeBlock
+                      ? handleUpdateTimeBlock
+                      : handleCreateTimeBlock
+                  }
+                  loading={saving}
+                >
+                  {editingTimeBlock ? "Salvar" : "Adicionar"}
+                </PrimaryButton>
+              </div>
+            </div>
 
-      <Modal
-        open={modal === "manageTimeBlocks"}
-        onClose={() => setModal(null)}
-        title="Gerenciar Horários"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <input
-              type="text"
-              placeholder="Nome (ex: 1º horário)"
-              value={editingTimeBlock ? timeBlockForm.name : timeBlockForm.name}
-              onChange={(e) =>
-                setTimeBlockForm((f) => ({ ...f, name: e.target.value }))
-              }
-              style={{ ...inputStyle, flex: 1 }}
-            />
-            <input
-              type="time"
-              value={timeBlockForm.startTime}
-              onChange={(e) =>
-                setTimeBlockForm((f) => ({ ...f, startTime: e.target.value }))
-              }
-              style={{ width: 100 }}
-            />
-            <input
-              type="time"
-              value={timeBlockForm.endTime}
-              onChange={(e) =>
-                setTimeBlockForm((f) => ({ ...f, endTime: e.target.value }))
-              }
-              style={{ width: 100 }}
-            />
-            <PrimaryButton
-              onClick={
-                editingTimeBlock ? handleUpdateTimeBlock : handleCreateTimeBlock
-              }
-              loading={saving}
-            >
-              {editingTimeBlock ? "Salvar" : "Adicionar"}
-            </PrimaryButton>
-          </div>
-        </div>
-
-        <div style={{ maxHeight: 400, overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Ordem
-                </th>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Nome
-                </th>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Horário
-                </th>
-                <th style={{ padding: 8, textAlign: "right", fontSize: 12 }}>
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {timeBlocks
-                .sort((a, b) => a.order - b.order)
-                .map((block) => (
-                  <tr
-                    key={block.id}
-                    style={{ borderBottom: "1px solid #f1f5f9" }}
-                  >
-                    <td style={{ padding: 8, fontSize: 12 }}>
-                      {block.order + 1}
-                    </td>
-                    <td style={{ padding: 8, fontSize: 12 }}>{block.name}</td>
-                    <td style={{ padding: 8, fontSize: 12 }}>
-                      {formatTime(block.startTime)} -{" "}
-                      {formatTime(block.endTime)}
-                    </td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
-                      <PrimaryButton
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingTimeBlock(block);
-                          setTimeBlockForm({
-                            name: block.name,
-                            startTime: formatTime(block.startTime),
-                            endTime: formatTime(block.endTime),
-                          });
-                        }}
-                        style={{ marginRight: 4, padding: "4px 8px" }}
-                      >
-                        Editar
-                      </PrimaryButton>
-                      <PrimaryButton
-                        variant="danger"
-                        onClick={() => handleDeleteTimeBlock(block.id)}
-                        loading={saving}
-                        style={{ padding: "4px 8px" }}
-                      >
-                        Desativar
-                      </PrimaryButton>
-                    </td>
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Ordem
+                    </th>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Nome
+                    </th>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Horário
+                    </th>
+                    <th
+                      style={{ padding: 8, textAlign: "right", fontSize: 12 }}
+                    >
+                      Ações
+                    </th>
                   </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {timeBlocks
+                    .sort((a, b) => a.order - b.order)
+                    .map((block) => (
+                      <tr
+                        key={block.id}
+                        style={{ borderBottom: "1px solid #f1f5f9" }}
+                      >
+                        <td style={{ padding: 8, fontSize: 12 }}>
+                          {block.order + 1}
+                        </td>
+                        <td style={{ padding: 8, fontSize: 12 }}>
+                          {block.name}
+                        </td>
+                        <td style={{ padding: 8, fontSize: 12 }}>
+                          {formatTime(block.startTime)} -{" "}
+                          {formatTime(block.endTime)}
+                        </td>
+                        <td style={{ padding: 8, textAlign: "right" }}>
+                          <PrimaryButton
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingTimeBlock(block);
+                              setTimeBlockForm({
+                                name: block.name,
+                                startTime: formatTime(block.startTime),
+                                endTime: formatTime(block.endTime),
+                              });
+                            }}
+                            style={{ marginRight: 4, padding: "4px 8px" }}
+                          >
+                            Editar
+                          </PrimaryButton>
+                          <PrimaryButton
+                            variant="danger"
+                            onClick={() => handleDeleteTimeBlock(block.id)}
+                            loading={saving}
+                            style={{ padding: "4px 8px" }}
+                          >
+                            Desativar
+                          </PrimaryButton>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
 
-        <ModalFooter>
-          <PrimaryButton onClick={() => setModal(null)}>Fechar</PrimaryButton>
-        </ModalFooter>
-      </Modal>
+            <ModalFooter>
+              <PrimaryButton onClick={() => setModal(null)}>
+                Fechar
+              </PrimaryButton>
+            </ModalFooter>
+          </Modal>
 
-      <Modal
-        open={modal === "manageRooms"}
-        onClose={() => setModal(null)}
-        title="Gerenciar Salas"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <input
-              type="text"
-              placeholder="Nome da sala"
-              value={editingRoom ? roomForm.name : roomForm.name}
-              onChange={(e) =>
-                setRoomForm((f) => ({ ...f, name: e.target.value }))
-              }
-              style={{ ...inputStyle, flex: 1 }}
-            />
-            <input
-              type="number"
-              placeholder="Capacidade"
-              value={roomForm.capacity}
-              onChange={(e) =>
-                setRoomForm((f) => ({ ...f, capacity: e.target.value }))
-              }
-              style={{ width: 100 }}
-            />
-            <PrimaryButton
-              onClick={editingRoom ? handleUpdateRoom : handleCreateRoom}
-              loading={saving}
-            >
-              {editingRoom ? "Salvar" : "Adicionar"}
-            </PrimaryButton>
-          </div>
-        </div>
+          <Modal
+            open={modal === "manageRooms"}
+            onClose={() => setModal(null)}
+            title="Gerenciar Salas"
+          >
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="Nome da sala"
+                  value={editingRoom ? roomForm.name : roomForm.name}
+                  onChange={(e) =>
+                    setRoomForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <input
+                  type="number"
+                  placeholder="Capacidade"
+                  value={roomForm.capacity}
+                  onChange={(e) =>
+                    setRoomForm((f) => ({ ...f, capacity: e.target.value }))
+                  }
+                  style={{ width: 100 }}
+                />
+                <PrimaryButton
+                  onClick={editingRoom ? handleUpdateRoom : handleCreateRoom}
+                  loading={saving}
+                >
+                  {editingRoom ? "Salvar" : "Adicionar"}
+                </PrimaryButton>
+              </div>
+            </div>
 
-        <div style={{ maxHeight: 400, overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Nome
-                </th>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Capacidade
-                </th>
-                <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
-                  Status
-                </th>
-                <th style={{ padding: 8, textAlign: "right", fontSize: 12 }}>
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rooms.map((room) => (
-                <tr key={room.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: 8, fontSize: 12 }}>{room.name}</td>
-                  <td style={{ padding: 8, fontSize: 12 }}>
-                    {room.capacity || "-"}
-                  </td>
-                  <td style={{ padding: 8, fontSize: 12 }}>
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        fontSize: 11,
-                        background: room.active ? "#d1fae5" : "#fee2e2",
-                        color: room.active ? "#065f46" : "#991b1b",
-                      }}
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Nome
+                    </th>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Capacidade
+                    </th>
+                    <th style={{ padding: 8, textAlign: "left", fontSize: 12 }}>
+                      Status
+                    </th>
+                    <th
+                      style={{ padding: 8, textAlign: "right", fontSize: 12 }}
                     >
-                      {room.active ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                  <td style={{ padding: 8, textAlign: "right" }}>
-                    <PrimaryButton
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingRoom(room);
-                        setRoomForm({
-                          name: room.name,
-                          capacity: room.capacity?.toString() || "",
-                        });
-                      }}
-                      style={{ marginRight: 4, padding: "4px 8px" }}
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rooms.map((room) => (
+                    <tr
+                      key={room.id}
+                      style={{ borderBottom: "1px solid #f1f5f9" }}
                     >
-                      Editar
-                    </PrimaryButton>
-                    <PrimaryButton
-                      variant="danger"
-                      onClick={() => handleDeleteRoom(room.id)}
-                      loading={saving}
-                      style={{ padding: "4px 8px" }}
-                    >
-                      Desativar
-                    </PrimaryButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      <td style={{ padding: 8, fontSize: 12 }}>{room.name}</td>
+                      <td style={{ padding: 8, fontSize: 12 }}>
+                        {room.capacity || "-"}
+                      </td>
+                      <td style={{ padding: 8, fontSize: 12 }}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            background: room.active ? "#d1fae5" : "#fee2e2",
+                            color: room.active ? "#065f46" : "#991b1b",
+                          }}
+                        >
+                          {room.active ? "Ativo" : "Inativo"}
+                        </span>
+                      </td>
+                      <td style={{ padding: 8, textAlign: "right" }}>
+                        <PrimaryButton
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingRoom(room);
+                            setRoomForm({
+                              name: room.name,
+                              capacity: room.capacity?.toString() || "",
+                            });
+                          }}
+                          style={{ marginRight: 4, padding: "4px 8px" }}
+                        >
+                          Editar
+                        </PrimaryButton>
+                        <PrimaryButton
+                          variant="danger"
+                          onClick={() => handleDeleteRoom(room.id)}
+                          loading={saving}
+                          style={{ padding: "4px 8px" }}
+                        >
+                          Desativar
+                        </PrimaryButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        <ModalFooter>
-          <PrimaryButton onClick={() => setModal(null)}>Fechar</PrimaryButton>
-        </ModalFooter>
-      </Modal>
+            <ModalFooter>
+              <PrimaryButton onClick={() => setModal(null)}>
+                Fechar
+              </PrimaryButton>
+            </ModalFooter>
+          </Modal>
+        </>
+      )}
     </PageShell>
   );
 }

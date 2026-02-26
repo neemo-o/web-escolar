@@ -124,6 +124,49 @@ export class SchedulesService {
       throw new Error("Bloco de horário é obrigatório");
     }
 
+    // FIX #7: Validate that all related entities belong to the same school
+    const [classroom, subject, timeBlock] = await Promise.all([
+      prisma.classroom.findFirst({
+        where: { id: data.classroomId, schoolId: data.schoolId },
+      }),
+      prisma.subject.findFirst({
+        where: { id: data.subjectId, schoolId: data.schoolId },
+      }),
+      prisma.timeBlock.findFirst({
+        where: { id: data.timeBlockId, schoolId: data.schoolId },
+      }),
+    ]);
+
+    if (!classroom) {
+      throw new Error("A turma não pertence a esta escola");
+    }
+    if (!subject) {
+      throw new Error("A disciplina não pertence a esta escola");
+    }
+    if (!timeBlock) {
+      throw new Error("O bloco de horário não pertence a esta escola");
+    }
+
+    // Validate teacher belongs to school if provided
+    if (data.teacherId) {
+      const teacher = await prisma.user.findFirst({
+        where: { id: data.teacherId, schoolId: data.schoolId, role: "TEACHER" },
+      });
+      if (!teacher) {
+        throw new Error("O professor não pertence a esta escola");
+      }
+    }
+
+    // Validate room belongs to school if provided
+    if (data.roomId) {
+      const room = await prisma.room.findFirst({
+        where: { id: data.roomId, schoolId: data.schoolId },
+      });
+      if (!room) {
+        throw new Error("A sala não pertence a esta escola");
+      }
+    }
+
     // Check classroom conflict
     const hasClassroomConflict = await this.checkClassroomConflict(
       data.classroomId,
@@ -187,6 +230,7 @@ export class SchedulesService {
 
   async update(
     id: string,
+    schoolId: string,
     data: {
       subjectId?: string;
       teacherId?: string;
@@ -195,59 +239,102 @@ export class SchedulesService {
       dayOfWeek?: number;
     },
   ) {
-    const schedule = await prisma.schedule.findUnique({ where: { id } });
-    if (!schedule) throw new Error("Schedule not found");
+    // FIX #3: Validate schoolId before updating
+    const schedule = await prisma.schedule.findFirst({
+      where: { id, schoolId },
+    });
+    if (!schedule) {
+      throw new Error("ACCESS_DENIED");
+    }
+
+    // FIX #7: Validate that subject belongs to the school if being changed
+    if (data.subjectId) {
+      const subject = await prisma.subject.findFirst({
+        where: { id: data.subjectId, schoolId },
+      });
+      if (!subject) {
+        throw new Error("A disciplina não pertence a esta escola");
+      }
+    }
+
+    // FIX #7: Validate that teacher belongs to the school if being changed
+    if (data.teacherId) {
+      const teacher = await prisma.user.findFirst({
+        where: { id: data.teacherId, schoolId, role: "TEACHER" },
+      });
+      if (!teacher) {
+        throw new Error("O professor não pertence a esta escola");
+      }
+    }
+
+    // FIX #7: Validate that room belongs to the school if being changed
+    if (data.roomId) {
+      const room = await prisma.room.findFirst({
+        where: { id: data.roomId, schoolId },
+      });
+      if (!room) {
+        throw new Error("A sala não pertence a esta escola");
+      }
+    }
+
+    // FIX #7: Validate that timeBlock belongs to the school if being changed
+    if (data.timeBlockId) {
+      const timeBlock = await prisma.timeBlock.findFirst({
+        where: { id: data.timeBlockId, schoolId },
+      });
+      if (!timeBlock) {
+        throw new Error("O bloco de horário não pertence a esta escola");
+      }
+    }
 
     const dayOfWeek = data.dayOfWeek ?? schedule.dayOfWeek;
     const timeBlockId = data.timeBlockId ?? schedule.timeBlockId;
 
-    // If changing day or time block, check conflicts
-    if (data.dayOfWeek !== undefined || data.timeBlockId !== undefined) {
-      // Check classroom conflict
-      const hasClassroomConflict = await this.checkClassroomConflict(
-        schedule.classroomId!,
+    // FIX #8: Check for conflicts even when only teacherId or roomId changes
+    // Check room conflict if room is being changed or is already set
+    const roomId = data.roomId ?? schedule.roomId;
+    if (roomId) {
+      const hasRoomConflict = await this.checkRoomConflict(
+        roomId,
         dayOfWeek,
-        timeBlockId,
+        timeBlockId!,
         id,
       );
-      if (hasClassroomConflict) {
+      if (hasRoomConflict) {
         throw new Error(
-          "CONFLICT_CLASSROOM: Já existe uma aula nesta turma neste horário.",
+          "CONFLICT_ROOM: Esta sala já está reservada neste horário.",
         );
       }
+    }
 
-      // Check room conflict if room is specified
-      const roomId = data.roomId ?? schedule.roomId;
-      if (roomId) {
-        const hasRoomConflict = await this.checkRoomConflict(
-          roomId,
-          dayOfWeek,
-          timeBlockId,
-          id,
+    // Check teacher conflict if teacher is being changed or is already set
+    const teacherId = data.teacherId ?? schedule.teacherId;
+    if (teacherId) {
+      const teacherConflict = await this.checkTeacherConflict(
+        teacherId,
+        dayOfWeek,
+        timeBlockId!,
+        id,
+      );
+      if (teacherConflict.hasConflict) {
+        const cs = teacherConflict.conflictingSchedule;
+        throw new Error(
+          `CONFLICT_TEACHER: O professor já está ministrando aula em ${cs.classroom.name} (${cs.subject.name}) neste horário.`,
         );
-        if (hasRoomConflict) {
-          throw new Error(
-            "CONFLICT_ROOM: Esta sala já está reservada neste horário.",
-          );
-        }
       }
+    }
 
-      // Check teacher conflict if teacher is specified
-      const teacherId = data.teacherId ?? schedule.teacherId;
-      if (teacherId) {
-        const teacherConflict = await this.checkTeacherConflict(
-          teacherId,
-          dayOfWeek,
-          timeBlockId,
-          id,
-        );
-        if (teacherConflict.hasConflict) {
-          const cs = teacherConflict.conflictingSchedule;
-          throw new Error(
-            `CONFLICT_TEACHER: O professor já está ministrando aula em ${cs.classroom.name} (${cs.subject.name}) neste horário.`,
-          );
-        }
-      }
+    // Check classroom conflict
+    const hasClassroomConflict = await this.checkClassroomConflict(
+      schedule.classroomId!,
+      dayOfWeek,
+      timeBlockId!,
+      id,
+    );
+    if (hasClassroomConflict) {
+      throw new Error(
+        "CONFLICT_CLASSROOM: Já existe uma aula nesta turma neste horário.",
+      );
     }
 
     return prisma.schedule.update({
@@ -263,7 +350,15 @@ export class SchedulesService {
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, schoolId: string) {
+    // FIX #2: Validate schoolId before deleting
+    const schedule = await prisma.schedule.findFirst({
+      where: { id, schoolId },
+    });
+    if (!schedule) {
+      throw new Error("ACCESS_DENIED");
+    }
+
     return prisma.schedule.delete({ where: { id } });
   }
 

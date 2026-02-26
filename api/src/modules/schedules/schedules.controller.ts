@@ -51,11 +51,9 @@ export const create = async (req: Request, res: Response) => {
     }
 
     if (!classroomId || !subjectId || dayOfWeek === undefined || !timeBlockId) {
-      res
-        .status(400)
-        .json({
-          message: "Todos os campos obrigatórios devem ser preenchidos",
-        });
+      res.status(400).json({
+        message: "Todos os campos obrigatórios devem ser preenchidos",
+      });
       return;
     }
 
@@ -86,10 +84,16 @@ export const create = async (req: Request, res: Response) => {
 // PATCH /schedules/:id - Update a schedule
 export const update = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { subjectId, teacherId, roomId, timeBlockId, dayOfWeek } = req.body;
 
-    const schedule = await schedulesService.update(id, {
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const schedule = await schedulesService.update(id, schoolId, {
       subjectId,
       teacherId,
       roomId,
@@ -100,6 +104,10 @@ export const update = async (req: Request, res: Response) => {
     res.json(schedule);
   } catch (error: any) {
     console.error("Error updating schedule:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     if (error.message?.startsWith("CONFLICT_")) {
       const [, message] = error.message.split(":");
       res
@@ -114,11 +122,22 @@ export const update = async (req: Request, res: Response) => {
 // DELETE /schedules/:id - Delete a schedule
 export const remove = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    await schedulesService.delete(id);
+
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    await schedulesService.delete(id, schoolId);
     res.status(204).send();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting schedule:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     res.status(500).json({ message: "Erro ao excluir horário" });
   }
 };

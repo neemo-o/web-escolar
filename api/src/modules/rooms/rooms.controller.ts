@@ -38,8 +38,16 @@ export const listAll = async (req: Request, res: Response) => {
 // GET /rooms/:id - Get a specific room
 export const getById = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const room = await roomService.findById(id);
+
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #9: Validate schoolId before fetching
+    const room = await roomService.findById(id, schoolId);
 
     if (!room) {
       res.status(404).json({ message: "Sala não encontrada" });
@@ -85,18 +93,34 @@ export const create = async (req: Request, res: Response) => {
 // PATCH /rooms/:id - Update a room
 export const update = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { name, capacity, active } = req.body;
 
-    const room = await roomService.update(id, {
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #5: Validate schoolId before updating
+    const room = await roomService.update(id, schoolId, {
       name,
       capacity,
       active,
     });
 
+    if (!room) {
+      res.status(404).json({ message: "Sala não encontrada" });
+      return;
+    }
+
     res.json(room);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating room:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     res.status(500).json({ message: "Erro ao atualizar sala" });
   }
 };
@@ -104,10 +128,17 @@ export const update = async (req: Request, res: Response) => {
 // DELETE /rooms/:id - Deactivate a room
 export const remove = async (req: Request, res: Response) => {
   try {
+    const schoolId = (req as any).user?.schoolId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
+    if (!schoolId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // FIX #5: Validate schoolId before deleting
     // Check if room has schedules
-    const hasSchedules = await roomService.hasSchedules(id);
+    const hasSchedules = await roomService.hasSchedules(id, schoolId);
     if (hasSchedules) {
       res.status(400).json({
         message:
@@ -116,10 +147,18 @@ export const remove = async (req: Request, res: Response) => {
       return;
     }
 
-    await roomService.delete(id);
+    const deleted = await roomService.delete(id, schoolId);
+    if (!deleted) {
+      res.status(404).json({ message: "Sala não encontrada" });
+      return;
+    }
     res.status(204).send();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting room:", error);
+    if (error.message === "ACCESS_DENIED") {
+      res.status(403).json({ message: "Acesso negado" });
+      return;
+    }
     res.status(500).json({ message: "Erro ao desativar sala" });
   }
 };

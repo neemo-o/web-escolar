@@ -15,9 +15,10 @@ export class TimeBlockService {
     });
   }
 
-  async findById(id: string) {
-    return prisma.timeBlock.findUnique({
-      where: { id },
+  // FIX #9: Validate schoolId in findById
+  async findById(id: string, schoolId: string) {
+    return prisma.timeBlock.findFirst({
+      where: { id, schoolId },
     });
   }
 
@@ -50,8 +51,10 @@ export class TimeBlockService {
     });
   }
 
+  // FIX #4: Validate schoolId in update
   async update(
     id: string,
+    schoolId: string,
     data: {
       name?: string;
       startTime?: string;
@@ -60,6 +63,14 @@ export class TimeBlockService {
       active?: boolean;
     },
   ) {
+    // Check if time block belongs to the school
+    const existing = await prisma.timeBlock.findFirst({
+      where: { id, schoolId },
+    });
+    if (!existing) {
+      throw new Error("ACCESS_DENIED");
+    }
+
     const updateData: any = { ...data };
     if (data.startTime) {
       updateData.startTime = new Date(`1970-01-01T${data.startTime}`);
@@ -74,28 +85,37 @@ export class TimeBlockService {
     });
   }
 
-  // Soft delete - just deactivate
-  async delete(id: string) {
+  // FIX #4: Validate schoolId in delete
+  async delete(id: string, schoolId: string) {
+    // Check if time block belongs to the school
+    const existing = await prisma.timeBlock.findFirst({
+      where: { id, schoolId },
+    });
+    if (!existing) {
+      throw new Error("ACCESS_DENIED");
+    }
+
+    // Soft delete - just deactivate
     return prisma.timeBlock.update({
       where: { id },
       data: { active: false },
     });
   }
 
-  // Check if block has schedules
-  async hasSchedules(id: string): Promise<boolean> {
+  // FIX #4: Validate schoolId in hasSchedules
+  async hasSchedules(id: string, schoolId: string): Promise<boolean> {
     const count = await prisma.schedule.count({
-      where: { timeBlockId: id },
+      where: { timeBlockId: id, schoolId },
     });
     return count > 0;
   }
 
-  // Reorder blocks
+  // FIX #6: Validate schoolId in reorder
   async reorder(schoolId: string, orderedIds: string[]) {
     return prisma.$transaction(
       orderedIds.map((id, index) =>
-        prisma.timeBlock.update({
-          where: { id },
+        prisma.timeBlock.updateMany({
+          where: { id, schoolId },
           data: { order: index },
         }),
       ),
