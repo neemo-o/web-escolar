@@ -67,7 +67,18 @@ type Teacher = { id: string; userId: string; name: string };
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DAYS_TO_SHOW = [1, 2, 3, 4, 5, 6];
-const ROW_HEIGHT = 56;
+const ROW_HEIGHT = 64;
+
+const headerCellStyle: React.CSSProperties = {
+  padding: "10px 12px",
+  fontWeight: 700,
+  color: "#6b7280",
+  fontSize: 11,
+  letterSpacing: "0.4px",
+  textTransform: "uppercase",
+  borderBottom: "1px solid #e9ebf0",
+  background: "#f8fafc",
+};
 
 const SUBJECT_COLORS = [
   "linear-gradient(135deg, #0891b2, #0e7490)",
@@ -229,7 +240,6 @@ export default function Schedule() {
       const res = await api.fetchJson(`/schedules?${params}`);
       const schedulesData = res?.data ?? res ?? [];
 
-      // FIX #12: Warn about schedules without timeBlockId
       const schedulesWithoutBlock = schedulesData.filter(
         (s: Schedule) => !s.timeBlockId,
       );
@@ -261,11 +271,9 @@ export default function Schedule() {
 
   function handleGradeLevelChange(value: string) {
     setSelectedGradeLevel(value);
-    // FIX #14: Don't automatically select first classroom - require explicit selection
     setSelectedClassroom("");
   }
 
-  // Simple schedule grid - no combining
   const scheduleGrid = useMemo(() => {
     const grid: Record<string, Schedule[]> = {};
     DAYS_TO_SHOW.forEach((day) => {
@@ -318,7 +326,6 @@ export default function Schedule() {
   }
 
   async function handleCreate() {
-    // FIX #11: Require explicit classroom selection instead of silent fallback
     if (!selectedClassroom && !selectedGradeLevel) {
       toast("Selecione uma turma ou série primeiro", "error");
       return;
@@ -553,75 +560,137 @@ export default function Schedule() {
     [timeBlocks, shiftFilter],
   );
 
-  // Merge map for consecutive blocks with same subject and teacher
-  const mergeMap = useMemo(() => {
-    const map: Record<string, { rowSpan: number; hidden: boolean }> = {};
-
-    DAYS_TO_SHOW.forEach((day) => {
-      const blocks = activeTimeBlocks;
-      let i = 0;
-      while (i < blocks.length) {
-        const block = blocks[i];
-        const key = `${day}-${block.id}`;
-        const cellSchedules = scheduleGrid[key] || [];
-
-        // Only merge if exactly 1 schedule and try to find consecutive blocks
-        if (cellSchedules.length === 1) {
-          const currentSchedule = cellSchedules[0];
-          const group: { block: TimeBlock; key: string }[] = [{ block, key }];
-
-          // Look for consecutive blocks with same subject and teacher
-          let j = i + 1;
-          while (j < blocks.length) {
-            const nextBlock = blocks[j];
-            const nextKey = `${day}-${nextBlock.id}`;
-            const nextSchedules = scheduleGrid[nextKey] || [];
-
-            if (
-              nextSchedules.length === 1 &&
-              nextSchedules[0].subjectId === currentSchedule.subjectId &&
-              nextSchedules[0].teacherId === currentSchedule.teacherId &&
-              nextBlock.order === blocks[j - 1].order + 1
-            ) {
-              group.push({ block: nextBlock, key: nextKey });
-              j++;
-            } else {
-              break;
-            }
-          }
-
-          // Mark the group in mergeMap
-          if (group.length > 1) {
-            group.forEach((item, idx) => {
-              if (idx === 0) {
-                map[item.key] = { rowSpan: group.length, hidden: false };
-              } else {
-                map[item.key] = { rowSpan: 1, hidden: true };
-              }
-            });
-          } else {
-            map[key] = { rowSpan: 1, hidden: false };
-          }
-          i = j;
-        } else {
-          map[key] = { rowSpan: 1, hidden: false };
-          i++;
-        }
-      }
-    });
-
-    return map;
-  }, [activeTimeBlocks, scheduleGrid]);
-
   // FIX #10: Only show write buttons for SECRETARY role
   const canWrite = isSecretary;
+
+  // Render function for day column using CSS Grid
+  function renderDayColumn(day: number) {
+    const cells: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < activeTimeBlocks.length) {
+      const block = activeTimeBlocks[i];
+      const key = `${day}-${block.id}`;
+      const cellSchedules = scheduleGrid[key] || [];
+
+      // Detectar quantos blocos consecutivos têm a mesma aula
+      let span = 1;
+      if (cellSchedules.length === 1) {
+        while (i + span < activeTimeBlocks.length) {
+          const nextBlock = activeTimeBlocks[i + span];
+          // Verificar se é consecutivo por order
+          if (nextBlock.order !== block.order + span) break;
+          const nextKey = `${day}-${nextBlock.id}`;
+          const nextSchedules = scheduleGrid[nextKey] || [];
+          if (
+            nextSchedules.length === 1 &&
+            nextSchedules[0].subjectId === cellSchedules[0].subjectId &&
+            nextSchedules[0].teacherId === cellSchedules[0].teacherId
+          ) {
+            span++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      const heightPx = span * ROW_HEIGHT;
+
+      cells.push(
+        <div
+          key={key}
+          style={{
+            gridRow: `span ${span}`,
+            height: heightPx,
+            borderBottom: "1px solid #f1f5f9",
+            padding: 4,
+            boxSizing: "border-box",
+            cursor:
+              canWrite && (selectedClassroom || selectedGradeLevel)
+                ? "pointer"
+                : "default",
+          }}
+          onClick={() => {
+            if (!canWrite || (!selectedClassroom && !selectedGradeLevel))
+              return;
+            if (cellSchedules.length > 0) {
+              openEditModal(cellSchedules[0]);
+            } else {
+              openCreateModal(day, block.id);
+            }
+          }}
+        >
+          {cellSchedules.length > 0 ? (
+            cellSchedules.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  background: getSubjectColor(s.subjectId),
+                  borderRadius: 7,
+                  padding: "6px 8px",
+                  height: "100%",
+                  boxSizing: "border-box",
+                  color: "white",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-start",
+                  gap: 2,
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 12 }}>
+                  {s.subject.name}
+                </div>
+                {s.teacher && (
+                  <div style={{ fontSize: 10, opacity: 0.9 }}>
+                    {s.teacher.name}
+                  </div>
+                )}
+                {s.room && (
+                  <div style={{ fontSize: 10, opacity: 0.85 }}>
+                    {s.room.name}
+                  </div>
+                )}
+                {span > 1 && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      opacity: 0.8,
+                      marginTop: "auto",
+                      borderTop: "1px solid rgba(255,255,255,0.3)",
+                      paddingTop: 2,
+                    }}
+                  >
+                    {span} blocos consecutivos
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div
+              style={{
+                padding: "6px 8px",
+                color: "#9ca3af",
+                fontSize: 10.5,
+                fontStyle: "italic",
+              }}
+            >
+              Livre
+            </div>
+          )}
+        </div>
+      );
+
+      i += span;
+    }
+
+    return cells;
+  }
 
   return (
     <PageShell
       title="Horário"
       description="Gerencie o calendário semanal de aulas por turma ou série."
     >
-      {/* FIX #10: Only show write action buttons for SECRETARY */}
       {canWrite && (
         <div
           style={{
@@ -723,247 +792,106 @@ export default function Schedule() {
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 12.5,
-              minWidth: 800,
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th
+          {loading ? (
+            <div
+              style={{
+                padding: "48px 14px",
+                textAlign: "center",
+                color: "#9ca3af",
+              }}
+            >
+              Carregando...
+            </div>
+          ) : !selectedClassroom && !selectedGradeLevel ? (
+            <div
+              style={{
+                padding: "48px 14px",
+                textAlign: "center",
+                color: "#9ca3af",
+              }}
+            >
+              Selecione uma série ou turma para visualizar os horários.
+            </div>
+          ) : activeTimeBlocks.length === 0 ? (
+            <div
+              style={{
+                padding: "48px 14px",
+                textAlign: "center",
+                color: "#9ca3af",
+              }}
+            >
+              Nenhum bloco de horário configurado.
+              {canWrite && ' Clique em "Gerenciar Horários" para configurar.'}
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `90px repeat(${DAYS_TO_SHOW.length}, 1fr)`,
+                minWidth: 800,
+              }}
+            >
+              {/* Header row */}
+              <div style={headerCellStyle} />
+              {DAYS_TO_SHOW.map((day) => (
+                <div
+                  key={day}
                   style={{
-                    padding: "10px 12px",
-                    textAlign: "left",
-                    fontWeight: 700,
-                    color: "#6b7280",
-                    fontSize: 11,
-                    letterSpacing: "0.4px",
-                    textTransform: "uppercase",
-                    borderBottom: "1px solid #e9ebf0",
-                    width: 70,
+                    ...headerCellStyle,
+                    textAlign: "center",
+                    borderLeft: "1px solid #e9ebf0",
                   }}
                 >
-                  Horário
-                </th>
-                {DAYS_TO_SHOW.map((day) => (
-                  <th
-                    key={day}
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "center",
-                      fontWeight: 700,
-                      color: "#6b7280",
-                      fontSize: 11,
-                      letterSpacing: "0.4px",
-                      textTransform: "uppercase",
-                      borderBottom: "1px solid #e9ebf0",
-                      borderLeft: "1px solid #e9ebf0",
-                    }}
-                  >
-                    {DAY_LABELS[day]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={DAYS_TO_SHOW.length + 1}
-                    style={{
-                      padding: "48px 14px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Carregando...
-                  </td>
-                </tr>
-              ) : !selectedClassroom && !selectedGradeLevel ? (
-                <tr>
-                  <td
-                    colSpan={DAYS_TO_SHOW.length + 1}
-                    style={{
-                      padding: "48px 14px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Selecione uma série ou turma para visualizar os horários.
-                  </td>
-                </tr>
-              ) : activeTimeBlocks.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={DAYS_TO_SHOW.length + 1}
-                    style={{
-                      padding: "48px 14px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Nenhum bloco de horário configurado.
-                    {canWrite &&
-                      ' Clique em "Gerenciar Horários" para configurar.'}
-                  </td>
-                </tr>
-              ) : (
-                activeTimeBlocks.map((block) => (
-                  <tr
+                  {DAY_LABELS[day]}
+                </div>
+              ))}
+
+              {/* Time column */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateRows: `repeat(${activeTimeBlocks.length}, ${ROW_HEIGHT}px)`,
+                }}
+              >
+                {activeTimeBlocks.map((block) => (
+                  <div
                     key={block.id}
                     style={{
+                      height: ROW_HEIGHT,
+                      padding: "8px 10px",
                       borderBottom: "1px solid #f1f5f9",
-                      minHeight: ROW_HEIGHT,
+                      background: "#fafbfc",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: "#6b7280",
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
-                    <td
-                      style={{
-                        padding: "8px 10px",
-                        color: "#6b7280",
-                        fontWeight: 600,
-                        fontSize: 11.5,
-                        background: "#fafbfc",
-                      }}
-                    >
-                      {formatTime(block.startTime)} -{" "}
-                      {formatTime(block.endTime)}
-                    </td>
-                    {DAYS_TO_SHOW.map((day) => {
-                      const key = `${day}-${block.id}`;
-                      const cellSchedules = scheduleGrid[key] || [];
-                      const mergeInfo = mergeMap[key] || {
-                        rowSpan: 1,
-                        hidden: false,
-                      };
+                    {formatTime(block.startTime)} – {formatTime(block.endTime)}
+                  </div>
+                ))}
+              </div>
 
-                      // Skip hidden cells (they are merged into previous cell)
-                      if (mergeInfo.hidden) {
-                        return null;
-                      }
-
-                      const isMerged = mergeInfo.rowSpan > 1;
-
-                      return (
-                        <td
-                          key={key}
-                          rowSpan={mergeInfo.rowSpan}
-                          style={{
-                            padding: 4,
-                            borderLeft: "1px solid #e9ebf0",
-                            verticalAlign: "top",
-                            minHeight: 50,
-                            cursor:
-                              canWrite &&
-                              (selectedClassroom || selectedGradeLevel)
-                                ? "pointer"
-                                : "default",
-                          }}
-                          onClick={() => {
-                            if (
-                              canWrite &&
-                              cellSchedules.length === 0 &&
-                              (selectedClassroom || selectedGradeLevel)
-                            ) {
-                              openCreateModal(day, block.id);
-                            }
-                          }}
-                        >
-                          {cellSchedules.length > 0 ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                              }}
-                            >
-                              {cellSchedules.map((s) => (
-                                <div
-                                  key={s.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (canWrite) {
-                                      openEditModal(s);
-                                    }
-                                  }}
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderRadius: 8,
-                                    background: getSubjectColor(s.subjectId),
-                                    color: "#fff",
-                                    fontSize: 11,
-                                    cursor: canWrite ? "pointer" : "default",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontWeight: 700,
-                                      marginBottom: 2,
-                                    }}
-                                  >
-                                    {s.subject.name}
-                                  </div>
-                                  {s.teacher && (
-                                    <div
-                                      style={{
-                                        fontSize: 10,
-                                        opacity: 0.9,
-                                        marginBottom: 2,
-                                      }}
-                                    >
-                                      {s.teacher.name}
-                                    </div>
-                                  )}
-                                  {s.room && (
-                                    <div
-                                      style={{ fontSize: 10, opacity: 0.85 }}
-                                    >
-                                      {s.room.name}
-                                    </div>
-                                  )}
-                                  {isMerged && (
-                                    <div
-                                      style={{
-                                        fontSize: 9,
-                                        opacity: 0.8,
-                                        marginTop: 2,
-                                        paddingTop: 2,
-                                        borderTop:
-                                          "1px solid rgba(255,255,255,0.3)",
-                                      }}
-                                    >
-                                      {mergeInfo.rowSpan} blocos consecutivos
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div
-                              style={{
-                                padding: "6px 8px",
-                                color: "#9ca3af",
-                                fontSize: 10.5,
-                                fontStyle: "italic",
-                              }}
-                            >
-                              Livre
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+              {/* Day columns */}
+              {DAYS_TO_SHOW.map((day) => (
+                <div
+                  key={day}
+                  style={{
+                    borderLeft: "1px solid #e9ebf0",
+                    position: "relative",
+                    display: "grid",
+                    gridTemplateRows: `repeat(${activeTimeBlocks.length}, ${ROW_HEIGHT}px)`,
+                  }}
+                >
+                  {renderDayColumn(day)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* Only show modals for write operations if canWrite */}
       {canWrite && (
         <>
           <Modal
