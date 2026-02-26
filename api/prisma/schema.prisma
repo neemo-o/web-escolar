@@ -452,13 +452,17 @@ model Schedule {
   dayOfWeek   Int
   startTime   DateTime @db.Time()
   endTime     DateTime @db.Time()
+  room        String?  @db.VarChar(50) // Sala - para expansões futuras
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   classroom Classroom @relation(fields: [classroomId], references: [id])
   subject   Subject   @relation(fields: [subjectId], references: [id])
 
+  // Índices para buscas eficientes
   @@index([schoolId, classroomId])
+  @@index([schoolId, dayOfWeek])
+  @@unique([classroomId, dayOfWeek, startTime]) // Não permite conflito de horário na mesma turma
   @@map("schedules")
 }
 

@@ -20,7 +20,7 @@ import GradeLevels from "./pages/dashboard/views/secretary/GradeLevels";
 import Subjects from "./pages/dashboard/views/secretary/Subjects";
 import MyClassrooms from "./pages/dashboard/views/teacher/MyClassrooms";
 import MyStudents from "./pages/dashboard/views/teacher/MyStudents";
-import Schedule from "./pages/dashboard/views/teacher/Schedule";
+import Schedule from "./pages/dashboard/views/secretary/Schedule";
 import Assessments from "./pages/dashboard/views/teacher/Assessments";
 import Grades from "./pages/dashboard/views/teacher/Grades";
 import Progress from "./pages/dashboard/views/teacher/Progress";

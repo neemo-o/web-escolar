@@ -10,7 +10,6 @@ export async function fetchJson(input: string, init?: RequestInit) {
     ? input
     : `${base}${input.startsWith("/") ? "" : "/"}${input}`;
 
-  // prefer module-level token (set by AuthContext), fallback to localStorage
   const token =
     moduleToken ??
     (typeof window !== "undefined" ? localStorage.getItem("token") : null);
@@ -31,7 +30,6 @@ export async function fetchJson(input: string, init?: RequestInit) {
 
   if (!res.ok) {
     if (res.status === 401) {
-      // notify listeners (AuthContext) that logout should happen
       try {
         window.dispatchEvent(new Event("auth:logout"));
       } catch {}
@@ -79,4 +77,31 @@ export async function fetchBlob(input: string, init?: RequestInit) {
   return await res.blob();
 }
 
-export default { fetchJson, fetchBlob, setAuthToken };
+export async function postJson(input: string, body: any) {
+  return fetchJson(input, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchJson(input: string, body: any) {
+  return fetchJson(input, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteJson(input: string) {
+  return fetchJson(input, {
+    method: "DELETE",
+  });
+}
+
+export default {
+  fetchJson,
+  fetchBlob,
+  setAuthToken,
+  postJson,
+  patchJson,
+  deleteJson,
+};

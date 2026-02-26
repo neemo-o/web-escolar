@@ -94,6 +94,7 @@ export function PrimaryButton({
   children,
   type = "button",
   variant = "primary",
+  style,
 }: {
   onClick?: () => void;
   disabled?: boolean;
@@ -101,6 +102,7 @@ export function PrimaryButton({
   children: React.ReactNode;
   type?: "button" | "submit";
   variant?: "primary" | "danger" | "ghost";
+  style?: React.CSSProperties;
 }) {
   const styles: Record<string, React.CSSProperties> = {
     primary: {
@@ -149,6 +151,7 @@ export function PrimaryButton({
         transition: "opacity 0.15s",
         whiteSpace: "nowrap",
         ...styles[variant],
+        ...style,
       }}
     >
       {loading ? "Aguarde..." : children}
@@ -285,10 +288,8 @@ export function DataTable({
   loading?: boolean;
   emptyMessage?: string;
 }) {
-  // Support both API styles: rows (2D array) or data + render functions
   const renderRows = () => {
     if (data && columns.some((c) => c.render)) {
-      // New API: data array with render functions
       return data.map((row, i) => (
         <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
           {columns.map((col, j) => (
@@ -306,7 +307,6 @@ export function DataTable({
         </tr>
       ));
     } else if (rows) {
-      // Old API: 2D array of ReactNode
       return rows.map((row, i) => (
         <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
           {row.map((cell, j) => (
@@ -420,7 +420,6 @@ export function Pagination({
   const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
 
-  // Build visible page numbers with ellipsis
   function getPageNumbers(): (number | "...")[] {
     if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
     const result: (number | "...")[] = [];
@@ -649,12 +648,14 @@ export function Modal({
   title,
   children,
   width,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   width?: number;
+  footer?: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -743,6 +744,17 @@ export function Modal({
         <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
           {children}
         </div>
+        {footer && (
+          <div
+            style={{
+              padding: "16px 20px",
+              borderTop: "1px solid #f1f5f9",
+              flexShrink: 0,
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1009,4 +1021,73 @@ export function toast(
       new CustomEvent("toast", { detail: { type, message } }),
     );
   } catch {}
+}
+
+// Button component for general use
+export function Button({
+  onClick,
+  disabled,
+  loading,
+  children,
+  type = "button",
+  variant = "primary",
+  style,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  children: React.ReactNode;
+  type?: "button" | "submit";
+  variant?: "primary" | "secondary" | "danger";
+  style?: React.CSSProperties;
+}) {
+  const btnStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      background:
+        disabled || loading
+          ? "#e5e7eb"
+          : `linear-gradient(135deg, ${accent}, ${sidebarColor})`,
+      color: disabled || loading ? "#9ca3af" : "#fff",
+      border: "none",
+    },
+    secondary: {
+      background: "#fff",
+      color: "#374151",
+      border: "1.5px solid #e2e8f0",
+    },
+    danger: {
+      background:
+        disabled || loading
+          ? "#e5e7eb"
+          : "linear-gradient(135deg,#ef4444,#dc2626)",
+      color: disabled || loading ? "#9ca3af" : "#fff",
+      border: "none",
+    },
+  };
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled || loading}
+      style={{
+        height: 38,
+        padding: "0 16px",
+        borderRadius: 9,
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
+        fontFamily: "inherit",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "opacity 0.15s",
+        whiteSpace: "nowrap",
+        ...btnStyles[variant],
+        ...style,
+      }}
+    >
+      {loading ? "Aguarde..." : children}
+    </button>
+  );
 }

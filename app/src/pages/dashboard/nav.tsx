@@ -1,15 +1,35 @@
 import React from "react";
 import {
-  iconHome, iconSchool, iconUsers, iconChart, iconClipboard,
-  iconBook, iconStar, iconKey, iconCalendar, iconHeart,
+  iconHome,
+  iconSchool,
+  iconUsers,
+  iconChart,
+  iconClipboard,
+  iconBook,
+  iconStar,
+  iconKey,
+  iconCalendar,
+  iconHeart,
 } from "./icons";
 
-export type NavItem = { id: string; label: string; icon: React.ReactNode; badge?: number };
+export type NavItem = {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+};
 export type NavGroup = { label: string; items: NavItem[] };
 
 function iconLayers() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
       <polyline points="2 17 12 22 22 17" />
       <polyline points="2 12 12 17 22 12" />
@@ -19,7 +39,14 @@ function iconLayers() {
 
 function iconSubject() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       <line x1="8" y1="7" x2="16" y2="7" />
@@ -31,7 +58,14 @@ function iconSubject() {
 
 function iconYear() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
@@ -44,9 +78,24 @@ export function getNavGroups(role: string): NavGroup[] {
   switch (role) {
     case "ADMIN_GLOBAL":
       return [
-        { label: "Visão Geral", items: [{ id: "overview", label: "Painel Geral", icon: iconHome() }] },
-        { label: "Gestão de Sistema", items: [{ id: "schools", label: "Escolas", icon: iconSchool() }, { id: "global-users", label: "Usuários", icon: iconUsers() }] },
-        { label: "Monitoramento", items: [{ id: "reports", label: "Relatórios", icon: iconChart() }, { id: "audit", label: "Auditoria", icon: iconClipboard() }] },
+        {
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel Geral", icon: iconHome() }],
+        },
+        {
+          label: "Gestão de Sistema",
+          items: [
+            { id: "schools", label: "Escolas", icon: iconSchool() },
+            { id: "global-users", label: "Usuários", icon: iconUsers() },
+          ],
+        },
+        {
+          label: "Monitoramento",
+          items: [
+            { id: "reports", label: "Relatórios", icon: iconChart() },
+            { id: "audit", label: "Auditoria", icon: iconClipboard() },
+          ],
+        },
       ];
 
     case "SECRETARY":
@@ -76,6 +125,7 @@ export function getNavGroups(role: string): NavGroup[] {
         {
           label: "Acadêmico",
           items: [
+            { id: "schedule", label: "Horário", icon: iconCalendar() },
             { id: "grades-view", label: "Notas", icon: iconStar() },
             { id: "reports", label: "Relatórios", icon: iconChart() },
           ],
@@ -94,7 +144,10 @@ export function getNavGroups(role: string): NavGroup[] {
 
     case "TEACHER":
       return [
-        { label: "Visão Geral", items: [{ id: "overview", label: "Painel", icon: iconHome() }] },
+        {
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel", icon: iconHome() }],
+        },
         {
           label: "Ensino",
           items: [
@@ -105,33 +158,54 @@ export function getNavGroups(role: string): NavGroup[] {
             { id: "progress", label: "Progresso", icon: iconChart() },
           ],
         },
-        { label: "Agenda", items: [{ id: "schedule", label: "Horários", icon: iconCalendar() }] },
+        {
+          label: "Agenda",
+          items: [{ id: "schedule", label: "Horários", icon: iconCalendar() }],
+        },
       ];
 
     case "STUDENT":
       return [
-        { label: "Visão Geral", items: [{ id: "overview", label: "Painel", icon: iconHome() }] },
+        {
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel", icon: iconHome() }],
+        },
         {
           label: "Acadêmico",
           items: [
             { id: "my-grades", label: "Minhas Notas", icon: iconStar() },
-            { id: "my-assessments", label: "Avaliações", icon: iconClipboard() },
+            {
+              id: "my-assessments",
+              label: "Avaliações",
+              icon: iconClipboard(),
+            },
             { id: "my-progress", label: "Progresso", icon: iconChart() },
             // FIX #23: correct route for student classrooms (was pointing to guardian route)
-            { id: "student-classrooms", label: "Minhas Turmas", icon: iconBook() },
+            {
+              id: "student-classrooms",
+              label: "Minhas Turmas",
+              icon: iconBook(),
+            },
           ],
         },
       ];
 
     case "GUARDIAN":
       return [
-        { label: "Visão Geral", items: [{ id: "overview", label: "Painel", icon: iconHome() }] },
+        {
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel", icon: iconHome() }],
+        },
         {
           label: "Acompanhamento",
           items: [
             { id: "student-classrooms", label: "Turmas", icon: iconBook() },
             { id: "student-grades", label: "Notas", icon: iconStar() },
-            { id: "student-assessments", label: "Avaliações", icon: iconClipboard() },
+            {
+              id: "student-assessments",
+              label: "Avaliações",
+              icon: iconClipboard(),
+            },
             { id: "student-progress", label: "Progresso", icon: iconChart() },
             { id: "student-health", label: "Frequência", icon: iconHeart() },
           ],
@@ -139,7 +213,12 @@ export function getNavGroups(role: string): NavGroup[] {
       ];
 
     default:
-      return [{ label: "Visão Geral", items: [{ id: "overview", label: "Painel", icon: iconHome() }] }];
+      return [
+        {
+          label: "Visão Geral",
+          items: [{ id: "overview", label: "Painel", icon: iconHome() }],
+        },
+      ];
   }
 }
 
@@ -163,7 +242,7 @@ export const PAGE_TITLES: Record<string, string> = {
   assessments: "Avaliações",
   grades: "Notas",
   progress: "Progresso",
-  "students": "Alunos",
+  students: "Alunos",
   "my-grades": "Minhas Notas",
   "my-assessments": "Avaliações",
   "my-progress": "Progresso",
