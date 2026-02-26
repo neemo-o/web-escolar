@@ -35,6 +35,7 @@ import StudentHealth from "./pages/dashboard/views/guardian/StudentHealth";
 import Profile from "./pages/dashboard/views/common/Profile";
 import Settings from "./pages/dashboard/views/common/Settings";
 import Students from "./pages/dashboard/views/secretary/Students";
+import Documents from "./pages/dashboard/views/secretary/Documents";
 import { useAuth } from "./contexts/AuthContext";
 import PagePlaceholder from "./pages/dashboard/PagePlaceholder";
 import ToastContainer from "./components/ToastContainer";
@@ -202,6 +203,15 @@ function App() {
             element={
               <ProtectedView allowedRoles={ROUTE_ROLES["students"]}>
                 <Students />
+              </ProtectedView>
+            }
+          />
+
+          <Route
+            path="documents"
+            element={
+              <ProtectedView allowedRoles={ROUTE_ROLES["documents"]}>
+                <Documents />
               </ProtectedView>
             }
           />

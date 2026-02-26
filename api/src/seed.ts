@@ -53,9 +53,9 @@ async function main() {
   console.log("👑 ADMIN_GLOBAL criado");
 
   // =========================================================================
-  // ESCOLA ATIVA
+  // ESCOLA 1 - Escola São José
   // =========================================================================
-  const school = await prisma.school.create({
+  const school1 = await prisma.school.create({
     data: {
       name: "Escola São José",
       cnpj: "12.345.678/0001-99",
@@ -65,45 +65,15 @@ async function main() {
   });
 
   await prisma.schoolConfig.create({
-    data: { schoolId: school.id },
+    data: { schoolId: school1.id },
   });
 
-  console.log("🏫 Escola ativa criada:", school.name);
+  console.log("🏫 Escola 1 criada:", school1.name);
 
-  // =========================================================================
-  // ESCOLA INATIVA (para testar bloqueio)
-  // =========================================================================
-  const schoolInactive = await prisma.school.create({
+  // Usuários da Escola 1
+  const secretary1 = await prisma.user.create({
     data: {
-      name: "Escola Inativa",
-      cnpj: "99.999.999/0001-99",
-      slug: "escola-inativa",
-      active: false,
-    },
-  });
-
-  await prisma.schoolConfig.create({
-    data: { schoolId: schoolInactive.id },
-  });
-
-  const secretaryInactive = await prisma.user.create({
-    data: {
-      schoolId: schoolInactive.id,
-      email: "secretaria@inativa.com",
-      passwordHash: await hash("senha123"),
-      name: "Secretária Escola Inativa",
-      role: "SECRETARY",
-    },
-  });
-
-  console.log("🚫 Escola inativa criada (secretária para testar bloqueio)");
-
-  // =========================================================================
-  // USUÁRIOS DA ESCOLA ATIVA
-  // =========================================================================
-  const secretary = await prisma.user.create({
-    data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       email: "secretaria@saojose.com",
       passwordHash: await hash("secretaria123"),
       name: "Maria Secretária",
@@ -111,9 +81,9 @@ async function main() {
     },
   });
 
-  const teacher1 = await prisma.user.create({
+  const teacher1_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       email: "professor.joao@saojose.com",
       passwordHash: await hash("professor123"),
       name: "João Professor",
@@ -121,9 +91,9 @@ async function main() {
     },
   });
 
-  const teacher2 = await prisma.user.create({
+  const teacher2_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       email: "professor.ana@saojose.com",
       passwordHash: await hash("professor123"),
       name: "Ana Professora",
@@ -131,24 +101,41 @@ async function main() {
     },
   });
 
-  const guardian = await prisma.user.create({
+  const teacher3_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      email: "responsavel@saojose.com",
-      passwordHash: await hash("responsavel123"),
-      name: "Carlos Responsável",
+      schoolId: school1.id,
+      email: "professor.carlos@saojose.com",
+      passwordHash: await hash("professor123"),
+      name: "Carlos Professor",
+      role: "TEACHER",
+    },
+  });
+
+  // Responsáveis da Escola 1
+  const guardian1_escola1 = await prisma.user.create({
+    data: {
+      schoolId: school1.id,
+      email: "responsavel1@saojose.com",
+      passwordHash: await hash("resp123456"),
+      name: "Carlos Pai",
       role: "GUARDIAN",
     },
   });
 
-  console.log("👥 Usuários criados (secretary, 2 teachers, guardian)");
-
-  // =========================================================================
-  // ALUNOS + USER vinculado
-  // =========================================================================
-  const studentUser1 = await prisma.user.create({
+  const guardian2_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
+      email: "responsavel2@saojose.com",
+      passwordHash: await hash("resp123456"),
+      name: "Mãe Maria",
+      role: "GUARDIAN",
+    },
+  });
+
+  // Alunos da Escola 1
+  const studentUser1_escola1 = await prisma.user.create({
+    data: {
+      schoolId: school1.id,
       email: "aluno.pedro@saojose.com",
       passwordHash: await hash("aluno123"),
       name: "Pedro Aluno",
@@ -156,20 +143,20 @@ async function main() {
     },
   });
 
-  const student1 = await prisma.student.create({
+  const student1_escola1 = await prisma.student.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       name: "Pedro Aluno",
-cpf: "111.111.111-11",
-      birthDate: new Date("2008-05-10"),
+      cpf: "111.111.111-11",
+      birthDate: new Date("2010-05-10"),
       email: "aluno.pedro@saojose.com",
-      userId: studentUser1.id,
+      userId: studentUser1_escola1.id,
     },
   });
 
-  const studentUser2 = await prisma.user.create({
+  const studentUser2_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       email: "aluna.julia@saojose.com",
       passwordHash: await hash("aluno123"),
       name: "Júlia Aluna",
@@ -177,440 +164,241 @@ cpf: "111.111.111-11",
     },
   });
 
-  const student2 = await prisma.student.create({
+  const student2_escola1 = await prisma.student.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       name: "Júlia Aluna",
-cpf: "222.222.222-22",
-      birthDate: new Date("2008-09-20"),
+      cpf: "222.222.222-22",
+      birthDate: new Date("2010-09-20"),
       email: "aluna.julia@saojose.com",
-      userId: studentUser2.id,
+      userId: studentUser2_escola1.id,
     },
   });
 
-  // Aluno de outra turma (para testar isolamento do teacher)
-  const studentUser3 = await prisma.user.create({
+  const studentUser3_escola1 = await prisma.user.create({
     data: {
-      schoolId: school.id,
+      schoolId: school1.id,
       email: "aluno.lucas@saojose.com",
       passwordHash: await hash("aluno123"),
-      name: "Lucas Outro Aluno",
+      name: "Lucas Aluno",
       role: "STUDENT",
     },
   });
 
-  const student3 = await prisma.student.create({
+  const student3_escola1 = await prisma.student.create({
     data: {
-      schoolId: school.id,
-      name: "Lucas Outro Aluno",
-cpf: "333.333.333-33",
-      birthDate: new Date("2007-03-15"),
-      userId: studentUser3.id,
+      schoolId: school1.id,
+      name: "Lucas Aluno",
+      cpf: "333.333.333-33",
+      birthDate: new Date("2010-03-15"),
+      email: "aluno.lucas@saojose.com",
+      userId: studentUser3_escola1.id,
     },
   });
 
-  console.log("🎓 Alunos criados (3)");
-
-  // =========================================================================
-  // VÍNCULO GUARDIAN → ALUNO
-  // =========================================================================
+  // Vínculos Responsável → Aluno (Escola 1)
   await prisma.studentGuardian.create({
     data: {
-      schoolId: school.id,
-      studentId: student1.id,
-      guardianId: guardian.id,
+      schoolId: school1.id,
+      studentId: student1_escola1.id,
+      guardianId: guardian1_escola1.id,
+      relationType: "PAI",
     },
   });
 
-  console.log("🔗 Guardian vinculado ao aluno Pedro");
-
-  // =========================================================================
-  // ESTRUTURA ACADÊMICA
-  // =========================================================================
-
-  // Ano letivo
-  const academicYear = await prisma.academicYear.create({
+  await prisma.studentGuardian.create({
     data: {
-      schoolId: school.id,
-      year: 2025,
-      startDate: new Date("2025-02-01"),
-      endDate: new Date("2025-12-15"),
+      schoolId: school1.id,
+      studentId: student2_escola1.id,
+      guardianId: guardian2_escola1.id,
+      relationType: "MAE",
+    },
+  });
+
+  await prisma.studentGuardian.create({
+    data: {
+      schoolId: school1.id,
+      studentId: student3_escola1.id,
+      guardianId: guardian1_escola1.id,
+      relationType: "TUTOR_LEGAL",
+    },
+  });
+
+  console.log("👥 Escola 1: 1 secretary, 3 teachers, 2 guardians, 3 students");
+
+  // =========================================================================
+  // ESCOLA 2 - Escola Pedro II
+  // =========================================================================
+  const school2 = await prisma.school.create({
+    data: {
+      name: "Escola Pedro II",
+      cnpj: "98.765.432/0001-11",
+      slug: "escola-pedro-ii",
       active: true,
-      status: "EM_ANDAMENTO",
     },
   });
 
-  // Períodos (bimestres)
-  const period1 = await prisma.period.create({
+  await prisma.schoolConfig.create({
+    data: { schoolId: school2.id },
+  });
+
+  console.log("🏫 Escola 2 criada:", school2.name);
+
+  // Usuários da Escola 2
+  const secretary2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      academicYearId: academicYear.id,
-      name: "1º Bimestre",
-      sequence: 1,
-      startDate: new Date("2025-02-01"),
-      endDate: new Date("2025-04-30"),
-      status: "CLOSED",
+      schoolId: school2.id,
+      email: "secretaria@pedroii.com",
+      passwordHash: await hash("secretaria123"),
+      name: "José Secretária",
+      role: "SECRETARY",
     },
   });
 
-  const period2 = await prisma.period.create({
+  const teacher1_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      academicYearId: academicYear.id,
-      name: "2º Bimestre",
-      sequence: 2,
-      startDate: new Date("2025-05-01"),
-      endDate: new Date("2025-07-31"),
-      status: "OPEN",
+      schoolId: school2.id,
+      email: "professor.pedro@pedroii.com",
+      passwordHash: await hash("professor123"),
+      name: "Pedro Professor",
+      role: "TEACHER",
     },
   });
 
-  // Grade levels
-  const gradeLevel = await prisma.gradeLevel.create({
+  const teacher2_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      name: "7º Ano",
-      code: "7ANO",
-      sortOrder: 1,
+      schoolId: school2.id,
+      email: "professora.lucia@pedroii.com",
+      passwordHash: await hash("professor123"),
+      name: "Lúcia Professora",
+      role: "TEACHER",
     },
   });
 
-  const gradeLevel2 = await prisma.gradeLevel.create({
+  const teacher3_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      name: "8º Ano",
-      code: "8ANO",
-      sortOrder: 2,
+      schoolId: school2.id,
+      email: "professor.marco@pedroii.com",
+      passwordHash: await hash("professor123"),
+      name: "Marco Professor",
+      role: "TEACHER",
     },
   });
 
-  // Disciplinas
-  const subjectMath = await prisma.subject.create({
-    data: { schoolId: school.id, name: "Matemática", code: "MAT" },
-  });
-
-  const subjectPort = await prisma.subject.create({
-    data: { schoolId: school.id, name: "Português", code: "PORT" },
-  });
-
-  const subjectSci = await prisma.subject.create({
-    data: { schoolId: school.id, name: "Ciências", code: "CIE" },
-  });
-
-  console.log(
-    "📚 Estrutura acadêmica criada (ano, períodos, séries, disciplinas)",
-  );
-
-  // =========================================================================
-  // TURMAS
-  // =========================================================================
-  const classroom1 = await prisma.classroom.create({
+  // Responsáveis da Escola 2
+  const guardian1_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      academicYearId: academicYear.id,
-      gradeLevelId: gradeLevel.id,
-      name: "7A",
-      shift: "MANHA",
-      capacity: 30,
+      schoolId: school2.id,
+      email: "responsavel1@pedroii.com",
+      passwordHash: await hash("resp123456"),
+      name: "Paulo Pai",
+      role: "GUARDIAN",
     },
   });
 
-  // Turma de OUTRO professor (para testar isolamento)
-  const classroom2 = await prisma.classroom.create({
+  const guardian2_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      academicYearId: academicYear.id,
-      gradeLevelId: gradeLevel2.id,
-      name: "8A",
-      shift: "TARDE",
-      capacity: 25,
+      schoolId: school2.id,
+      email: "responsavel2@pedroii.com",
+      passwordHash: await hash("resp123456"),
+      name: "Sofia Mãe",
+      role: "GUARDIAN",
     },
   });
 
-  console.log("🏛 Turmas criadas (7A - teacher1, 8A - teacher2)");
-
-  // =========================================================================
-  // VÍNCULOS DISCIPLINA → TURMA
-  // =========================================================================
-  await prisma.classroomSubject.createMany({
-    data: [
-      {
-        schoolId: school.id,
-        classroomId: classroom1.id,
-        subjectId: subjectMath.id,
-        isRequired: true,
-        dateFrom: new Date("2025-02-01"),
-        workloadHours: 80,
-      },
-      {
-        schoolId: school.id,
-        classroomId: classroom1.id,
-        subjectId: subjectPort.id,
-        isRequired: true,
-        dateFrom: new Date("2025-02-01"),
-        workloadHours: 80,
-      },
-      {
-        schoolId: school.id,
-        classroomId: classroom2.id,
-        subjectId: subjectSci.id,
-        isRequired: true,
-        dateFrom: new Date("2025-02-01"),
-        workloadHours: 60,
-      },
-    ],
-  });
-
-  // =========================================================================
-  // VÍNCULOS PROFESSOR → TURMA
-  // =========================================================================
-  await prisma.classroomTeacher.create({
+  // Alunos da Escola 2
+  const studentUser1_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      subjectId: subjectMath.id,
-      teacherId: teacher1.id,
-      dateFrom: new Date("2025-02-01"),
+      schoolId: school2.id,
+      email: "aluno.andre@pedroii.com",
+      passwordHash: await hash("aluno123"),
+      name: "André Aluno",
+      role: "STUDENT",
     },
   });
 
-  await prisma.classroomTeacher.create({
+  const student1_escola2 = await prisma.student.create({
     data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      subjectId: subjectPort.id,
-      teacherId: teacher1.id,
-      dateFrom: new Date("2025-02-01"),
+      schoolId: school2.id,
+      name: "André Aluno",
+      cpf: "444.444.444-44",
+      birthDate: new Date("2011-02-15"),
+      email: "aluno.andre@pedroii.com",
+      userId: studentUser1_escola2.id,
     },
   });
 
-  await prisma.classroomTeacher.create({
+  const studentUser2_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      classroomId: classroom2.id,
-      subjectId: subjectSci.id,
-      teacherId: teacher2.id,
-      dateFrom: new Date("2025-02-01"),
+      schoolId: school2.id,
+      email: "aluna.beatriz@pedroii.com",
+      passwordHash: await hash("aluno123"),
+      name: "Beatriz Aluna",
+      role: "STUDENT",
     },
   });
 
-  console.log("🔗 Professores vinculados às turmas");
-
-  // =========================================================================
-  // MATRÍCULAS
-  // =========================================================================
-  const enrollment1 = await prisma.enrollment.create({
+  const student2_escola2 = await prisma.student.create({
     data: {
-      schoolId: school.id,
-      studentId: student1.id,
-      classroomId: classroom1.id,
-      academicYearId: academicYear.id,
-      enrollmentNumber: "2025-0001",
-      status: "ATIVA",
-      enrolledAt: new Date("2025-02-01"),
+      schoolId: school2.id,
+      name: "Beatriz Aluna",
+      cpf: "555.555.555-55",
+      birthDate: new Date("2011-07-22"),
+      email: "aluna.beatriz@pedroii.com",
+      userId: studentUser2_escola2.id,
     },
   });
 
-  const enrollment2 = await prisma.enrollment.create({
+  const studentUser3_escola2 = await prisma.user.create({
     data: {
-      schoolId: school.id,
-      studentId: student2.id,
-      classroomId: classroom1.id,
-      academicYearId: academicYear.id,
-      enrollmentNumber: "2025-0002",
-      status: "ATIVA",
-      enrolledAt: new Date("2025-02-01"),
+      schoolId: school2.id,
+      email: "aluno.gabriel@pedroii.com",
+      passwordHash: await hash("aluno123"),
+      name: "Gabriel Aluno",
+      role: "STUDENT",
     },
   });
 
-  // Aluno 3 na turma do teacher2 (para testar isolamento)
-  const enrollment3 = await prisma.enrollment.create({
+  const student3_escola2 = await prisma.student.create({
     data: {
-      schoolId: school.id,
-      studentId: student3.id,
-      classroomId: classroom2.id,
-      academicYearId: academicYear.id,
-      enrollmentNumber: "2025-0003",
-      status: "ATIVA",
-      enrolledAt: new Date("2025-02-01"),
+      schoolId: school2.id,
+      name: "Gabriel Aluno",
+      cpf: "666.666.666-66",
+      birthDate: new Date("2011-11-08"),
+      email: "aluno.gabriel@pedroii.com",
+      userId: studentUser3_escola2.id,
     },
   });
 
-  await prisma.enrollmentCounter.create({
+  // Vínculos Responsável → Aluno (Escola 2)
+  await prisma.studentGuardian.create({
     data: {
-      schoolId: school.id,
-      year: 2025,
-      lastNumber: 3,
+      schoolId: school2.id,
+      studentId: student1_escola2.id,
+      guardianId: guardian1_escola2.id,
+      relationType: "PAI",
     },
   });
 
-  console.log("📋 Matrículas criadas");
-
-  // =========================================================================
-  // AVALIAÇÕES
-  // =========================================================================
-  const assessment1 = await prisma.assessment.create({
+  await prisma.studentGuardian.create({
     data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      subjectId: subjectMath.id,
-      periodId: period1.id,
-      createdById: teacher1.id,
-      title: "Prova de Matemática - 1º Bimestre",
-      type: "prova",
-      status: "PUBLICADA",
-      maxScore: 10,
-      weight: 1,
-      date: new Date("2025-04-10"),
+      schoolId: school2.id,
+      studentId: student2_escola2.id,
+      guardianId: guardian2_escola2.id,
+      relationType: "MAE",
     },
   });
 
-  const assessment2 = await prisma.assessment.create({
+  await prisma.studentGuardian.create({
     data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      subjectId: subjectPort.id,
-      periodId: period1.id,
-      createdById: teacher1.id,
-      title: "Redação - 1º Bimestre",
-      type: "trabalho",
-      status: "PUBLICADA",
-      maxScore: 10,
-      weight: 1,
-      date: new Date("2025-04-20"),
+      schoolId: school2.id,
+      studentId: student3_escola2.id,
+      guardianId: guardian2_escola2.id,
+      relationType: "TUTOR_LEGAL",
     },
   });
 
-  // Avaliação da turma 2 (teacher2) — para testar isolamento
-  const assessment3 = await prisma.assessment.create({
-    data: {
-      schoolId: school.id,
-      classroomId: classroom2.id,
-      subjectId: subjectSci.id,
-      periodId: period1.id,
-      createdById: teacher2.id,
-      title: "Prova de Ciências - 8A",
-      type: "prova",
-      status: "PUBLICADA",
-      maxScore: 10,
-      weight: 1,
-      date: new Date("2025-04-15"),
-    },
-  });
-
-  console.log("📝 Avaliações criadas");
-
-  // =========================================================================
-  // NOTAS
-  // =========================================================================
-  const grade1 = await prisma.studentGrade.create({
-    data: {
-      schoolId: school.id,
-      assessmentId: assessment1.id,
-      enrollmentId: enrollment1.id,
-      score: 8.5,
-      launchedById: teacher1.id,
-      launchedAt: new Date(),
-    },
-  });
-
-  await prisma.studentGrade.create({
-    data: {
-      schoolId: school.id,
-      assessmentId: assessment1.id,
-      enrollmentId: enrollment2.id,
-      score: 7.0,
-      launchedById: teacher1.id,
-      launchedAt: new Date(),
-    },
-  });
-
-  await prisma.studentGrade.create({
-    data: {
-      schoolId: school.id,
-      assessmentId: assessment2.id,
-      enrollmentId: enrollment1.id,
-      score: 9.0,
-      launchedById: teacher1.id,
-      launchedAt: new Date(),
-    },
-  });
-
-  await prisma.studentGrade.create({
-    data: {
-      schoolId: school.id,
-      assessmentId: assessment3.id,
-      enrollmentId: enrollment3.id,
-      score: 6.5,
-      launchedById: teacher2.id,
-      launchedAt: new Date(),
-    },
-  });
-
-  // Audit de nota editada
-  await prisma.gradeAudit.create({
-    data: {
-      schoolId: school.id,
-      gradeId: grade1.id,
-      oldScore: 7.5,
-      newScore: 8.5,
-      changedById: teacher1.id,
-    },
-  });
-
-  console.log("🎯 Notas lançadas (com audit)");
-
-  // =========================================================================
-  // SESSÃO DE FREQUÊNCIA + REGISTROS
-  // =========================================================================
-  const session = await prisma.attendanceSession.create({
-    data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      subjectId: subjectMath.id,
-      createdById: teacher1.id,
-      date: new Date("2025-04-08"),
-      totalSlots: 1,
-      notes: "Aula de álgebra",
-    },
-  });
-
-  await prisma.attendanceRecord.createMany({
-    data: [
-      {
-        schoolId: school.id,
-        sessionId: session.id,
-        enrollmentId: enrollment1.id,
-        present: true,
-      },
-      {
-        schoolId: school.id,
-        sessionId: session.id,
-        enrollmentId: enrollment2.id,
-        present: false,
-      },
-    ],
-  });
-
-  console.log("📅 Sessão de frequência criada");
-
-  // =========================================================================
-  // ATIVIDADE
-  // =========================================================================
-  await prisma.activity.create({
-    data: {
-      schoolId: school.id,
-      classroomId: classroom1.id,
-      createdById: teacher1.id,
-      title: "Lista de Exercícios - Equações",
-      description: "Resolver os exercícios 1 a 10 do livro",
-      status: "PUBLICADA",
-      dueDate: new Date("2025-05-15"),
-      maxScore: 5,
-    },
-  });
-
-  console.log("📌 Atividade criada");
+  console.log("👥 Escola 2: 1 secretary, 3 teachers, 2 guardians, 3 students");
 
   // =========================================================================
   // SUMMARY
@@ -620,68 +408,35 @@ cpf: "333.333.333-33",
 
   console.log("🔑 CREDENCIAIS DE LOGIN:\n");
 
-  console.log("ADMIN_GLOBAL (sem schoolId no body):");
+  console.log("ADMIN_GLOBAL:");
   console.log("  email: admin@sistema.com");
   console.log("  password: admin123\n");
 
-  console.log("SECRETARY:");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: secretaria@saojose.com");
-  console.log("  password: secretaria123\n");
+  console.log("ESCOLA 1 - Escola São José:");
+  console.log(`  schoolId: ${school1.id}`);
+  console.log("  SECRETARY:  secretaria@saojose.com / secretaria123");
+  console.log("  TEACHERS:   professor.joao@saojose.com / professor123");
+  console.log("              professor.ana@saojose.com / professor123");
+  console.log("              professor.carlos@saojose.com / professor123");
+  console.log("  STUDENTS:   aluno.pedro@saojose.com / aluno123");
+  console.log("              aluno.julia@saojose.com / aluno123");
+  console.log("              aluno.lucas@saojose.com / aluno123");
+  console.log("  GUARDIANS:  responsavel1@saojose.com / resp123456");
+  console.log("              responsavel2@saojose.com / resp123456\n");
 
-  console.log("TEACHER (vinculado à turma 7A):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: professor.joao@saojose.com");
-  console.log("  password: professor123\n");
-
-  console.log("TEACHER 2 (vinculado à turma 8A - para testar isolamento):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: professor.ana@saojose.com");
-  console.log("  password: professor123\n");
-
-  console.log("STUDENT (Pedro - turma 7A, guardian vinculado):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: aluno.pedro@saojose.com");
-  console.log("  password: aluno123\n");
-
-  console.log("STUDENT 2 (Júlia - turma 7A):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: aluna.julia@saojose.com");
-  console.log("  password: aluno123\n");
-
-  console.log("STUDENT 3 (Lucas - turma 8A, sem guardian):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: aluno.lucas@saojose.com");
-  console.log("  password: aluno123\n");
-
-  console.log("GUARDIAN (vinculado ao Pedro):");
-  console.log(`  schoolId: ${school.id}`);
-  console.log("  email: responsavel@saojose.com");
-  console.log("  password: responsavel123\n");
-
-  console.log("ESCOLA INATIVA (login deve retornar erro):");
-  console.log(`  schoolId: ${schoolInactive.id}`);
-  console.log("  email: secretaria@inativa.com");
-  console.log("  password: senha123\n");
+  console.log("ESCOLA 2 - Escola Pedro II:");
+  console.log(`  schoolId: ${school2.id}`);
+  console.log("  SECRETARY:  secretaria@pedroii.com / secretaria123");
+  console.log("  TEACHERS:   professor.pedro@pedroii.com / professor123");
+  console.log("              professora.lucia@pedroii.com / professor123");
+  console.log("              professor.marco@pedroii.com / professor123");
+  console.log("  STUDENTS:   aluno.andre@pedroii.com / aluno123");
+  console.log("              aluno.beatriz@pedroii.com / aluno123");
+  console.log("              aluno.gabriel@pedroii.com / aluno123");
+  console.log("  GUARDIANS:  responsavel1@pedroii.com / resp123456");
+  console.log("              responsavel2@pedroii.com / resp123456\n");
 
   console.log("=".repeat(60));
-  console.log("\n📋 IDs ÚTEIS PARA O ENVIRONMENT DO POSTMAN:\n");
-  console.log(`schoolId:                  ${school.id}`);
-  console.log(`schoolId_inactive:         ${schoolInactive.id}`);
-  console.log(`teacherId:                 ${teacher1.id}`);
-  console.log(`studentId:                 ${student1.id}`);
-  console.log(`studentId_other (turma 8A):${student3.id}`);
-  console.log(`guardianId:                ${guardian.id}`);
-  console.log(`classId (7A):              ${classroom1.id}`);
-  console.log(`classId_other_teacher (8A):${classroom2.id}`);
-  console.log(`assessmentId:              ${assessment1.id}`);
-  console.log(`enrollmentId:              ${enrollment1.id}`);
-  console.log(`gradeId:                   ${grade1.id}`);
-  console.log(`academicYearId:            ${academicYear.id}`);
-  console.log(`periodId:                  ${period1.id}`);
-  console.log(`subjectId (MAT):           ${subjectMath.id}`);
-  console.log(`gradeLevelId:              ${gradeLevel.id}`);
-  console.log(`sessionId (frequência):    ${session.id}`);
 }
 
 main()

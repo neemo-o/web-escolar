@@ -23,6 +23,16 @@ enum PeriodStatus {
   CLOSED
 }
 
+enum TemplateType {
+  FREE
+  BOLETIM
+  COMPROVANTE_MATRICULA
+  HISTORICO_ESCOLAR
+  DECLARACAO_FREQUENCIA
+  FICHA_ALUNO
+}
+
+
 enum EnrollmentStatus {
   ATIVA
   CONCLUIDA
@@ -100,6 +110,25 @@ enum DocumentType {
   OUTRO
 }
 
+
+enum DocumentCategory {
+  DECLARACAO
+  COMUNICADO
+  ADVERTENCIA
+  SUSPENSAO
+  BOLETIM
+  CONTRATO
+  COMPROVANTE
+  OUTRO
+}
+
+enum IssuedDocumentStatus {
+  RASCUNHO
+  EMITIDO
+  ENTREGUE
+  CANCELADO
+}
+
 enum MovementType {
   MATRICULA
   TRANSFERENCIA_TURMA
@@ -142,6 +171,8 @@ model School {
   notifications      Notification[]
   timeBlocks         TimeBlock[]
   rooms              Room[]
+  documentTemplates DocumentTemplate[]
+  issuedDocuments    IssuedDocument[]
 
   @@map("schools")
 }
@@ -221,6 +252,9 @@ model User {
   financialResponsibleEnrollments Enrollment[]         @relation("EnrollmentFinancialResponsible")
   notifications                   Notification[]
   schedulesAsTeacher              Schedule[]           @relation("ScheduleTeacher")
+  createdTemplates   DocumentTemplate[] @relation("TemplateCreatedBy")
+  createdDocuments   IssuedDocument[]   @relation("DocumentCreatedBy")
+  deliveredDocuments IssuedDocument[]   @relation("DocumentDeliveredBy")
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -375,6 +409,71 @@ model Subject {
   @@unique([schoolId, code])
   @@index([schoolId])
   @@map("subjects")
+}
+
+model DocumentTemplate {
+  id                String           @id @default(uuid()) @db.Uuid
+  schoolId          String           @db.Uuid
+  name              String           @db.VarChar(200)
+  category          DocumentCategory @default(OUTRO)
+  templateType      TemplateType     @default(FREE)
+  description       String?
+  headerHtml        String?
+  footerHtml        String?
+  bodyTemplate      String           @default("")
+  showLogo          Boolean          @default(true)
+  requiresSignature Boolean          @default(false)
+  structuredConfig  Json?
+  active            Boolean          @default(true)
+  createdById       String?          @db.Uuid
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy       User?            @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  issuedDocuments IssuedDocument[]
+
+  @@index([schoolId])
+  @@index([schoolId, category])
+  @@index([schoolId, templateType])
+  @@map("document_templates")
+}
+
+model IssuedDocument {
+  id               String               @id @default(uuid()) @db.Uuid
+  schoolId         String               @db.Uuid
+  templateId       String?              @db.Uuid
+  studentId        String?              @db.Uuid
+  enrollmentId     String?              @db.Uuid
+  title            String               @db.VarChar(300)
+  bodySnapshot     String               @default("")
+  headerSnapshot   String?
+  footerSnapshot   String?
+  category         DocumentCategory     @default(OUTRO)
+  status           IssuedDocumentStatus @default(RASCUNHO)
+  structuredPayload Json?
+  fileUrl          String?
+  deliveredAt      DateTime?
+  deliveredById    String?              @db.Uuid
+  notes            String?
+  createdById      String?              @db.Uuid
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
+
+  school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template    DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  student     Student?          @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  enrollment  Enrollment?       @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  createdBy   User?             @relation("DocumentCreatedBy", fields: [createdById], references: [id])
+  deliveredBy User?             @relation("DocumentDeliveredBy", fields: [deliveredById], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, status])
+  @@index([schoolId, category])
+  @@map("issued_documents")
 }
 
 model Classroom {
@@ -560,6 +659,7 @@ model Student {
   health          StudentHealth?
   documents       StudentDocument[]
   movementHistory EnrollmentHistory[]
+  issuedDocuments IssuedDocument[]
 
   @@unique([schoolId, cpf])
   @@index([schoolId])
@@ -652,6 +752,7 @@ model Enrollment {
   activitySubmissions          ActivitySubmission[]
   history                      EnrollmentHistory[]
   documents                    EnrollmentDocument[]
+  issuedDocuments               IssuedDocument[]
 
   @@unique([schoolId, enrollmentNumber])
   @@index([schoolId, academicYearId, status])
