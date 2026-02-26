@@ -67,6 +67,7 @@ type Teacher = { id: string; userId: string; name: string };
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DAYS_TO_SHOW = [1, 2, 3, 4, 5, 6];
+const ROW_HEIGHT = 56;
 
 const SUBJECT_COLORS = [
   "linear-gradient(135deg, #0891b2, #0e7490)",
@@ -123,6 +124,9 @@ export default function Schedule() {
 
   const [selectedClassroom, setSelectedClassroom] = useState("");
   const [selectedGradeLevel, setSelectedGradeLevel] = useState("");
+  const [shiftFilter, setShiftFilter] = useState<
+    "all" | "morning" | "afternoon" | "evening"
+  >("all");
 
   const [modal, setModal] = useState<
     "create" | "edit" | "manageTimeBlocks" | "manageRooms" | null
@@ -527,11 +531,87 @@ export default function Schedule() {
     return time.substring(0, 5);
   }
 
+  function getBlockShift(
+    startTime: string,
+  ): "morning" | "afternoon" | "evening" {
+    const t = formatTime(startTime);
+    if (t < "12:30") return "morning";
+    if (t < "18:30") return "afternoon";
+    return "evening";
+  }
+
   const activeTimeBlocks = useMemo(
     () =>
-      timeBlocks.filter((tb) => tb.active).sort((a, b) => a.order - b.order),
-    [timeBlocks],
+      timeBlocks
+        .filter((tb) => tb.active)
+        .filter(
+          (tb) =>
+            shiftFilter === "all" ||
+            getBlockShift(tb.startTime) === shiftFilter,
+        )
+        .sort((a, b) => a.order - b.order),
+    [timeBlocks, shiftFilter],
   );
+
+  // Merge map for consecutive blocks with same subject and teacher
+  const mergeMap = useMemo(() => {
+    const map: Record<string, { rowSpan: number; hidden: boolean }> = {};
+
+    DAYS_TO_SHOW.forEach((day) => {
+      const blocks = activeTimeBlocks;
+      let i = 0;
+      while (i < blocks.length) {
+        const block = blocks[i];
+        const key = `${day}-${block.id}`;
+        const cellSchedules = scheduleGrid[key] || [];
+
+        // Only merge if exactly 1 schedule and try to find consecutive blocks
+        if (cellSchedules.length === 1) {
+          const currentSchedule = cellSchedules[0];
+          const group: { block: TimeBlock; key: string }[] = [{ block, key }];
+
+          // Look for consecutive blocks with same subject and teacher
+          let j = i + 1;
+          while (j < blocks.length) {
+            const nextBlock = blocks[j];
+            const nextKey = `${day}-${nextBlock.id}`;
+            const nextSchedules = scheduleGrid[nextKey] || [];
+
+            if (
+              nextSchedules.length === 1 &&
+              nextSchedules[0].subjectId === currentSchedule.subjectId &&
+              nextSchedules[0].teacherId === currentSchedule.teacherId &&
+              nextBlock.order === blocks[j - 1].order + 1
+            ) {
+              group.push({ block: nextBlock, key: nextKey });
+              j++;
+            } else {
+              break;
+            }
+          }
+
+          // Mark the group in mergeMap
+          if (group.length > 1) {
+            group.forEach((item, idx) => {
+              if (idx === 0) {
+                map[item.key] = { rowSpan: group.length, hidden: false };
+              } else {
+                map[item.key] = { rowSpan: 1, hidden: true };
+              }
+            });
+          } else {
+            map[key] = { rowSpan: 1, hidden: false };
+          }
+          i = j;
+        } else {
+          map[key] = { rowSpan: 1, hidden: false };
+          i++;
+        }
+      }
+    });
+
+    return map;
+  }, [activeTimeBlocks, scheduleGrid]);
 
   // FIX #10: Only show write buttons for SECRETARY role
   const canWrite = isSecretary;
@@ -600,6 +680,45 @@ export default function Schedule() {
               }))}
               placeholder="Selecione a turma"
             />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Turno:
+            </label>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[
+                { value: "all", label: "Todos" },
+                { value: "morning", label: "Matutino" },
+                { value: "afternoon", label: "Vespertino" },
+                { value: "evening", label: "Noturno" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() =>
+                    setShiftFilter(
+                      option.value as
+                        | "all"
+                        | "morning"
+                        | "afternoon"
+                        | "evening",
+                    )
+                  }
+                  style={{
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background:
+                      shiftFilter === option.value ? "#0891b2" : "white",
+                    color: shiftFilter === option.value ? "white" : "#374151",
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -695,7 +814,10 @@ export default function Schedule() {
                 activeTimeBlocks.map((block) => (
                   <tr
                     key={block.id}
-                    style={{ borderBottom: "1px solid #f1f5f9" }}
+                    style={{
+                      borderBottom: "1px solid #f1f5f9",
+                      minHeight: ROW_HEIGHT,
+                    }}
                   >
                     <td
                       style={{
@@ -712,10 +834,22 @@ export default function Schedule() {
                     {DAYS_TO_SHOW.map((day) => {
                       const key = `${day}-${block.id}`;
                       const cellSchedules = scheduleGrid[key] || [];
+                      const mergeInfo = mergeMap[key] || {
+                        rowSpan: 1,
+                        hidden: false,
+                      };
+
+                      // Skip hidden cells (they are merged into previous cell)
+                      if (mergeInfo.hidden) {
+                        return null;
+                      }
+
+                      const isMerged = mergeInfo.rowSpan > 1;
 
                       return (
                         <td
                           key={key}
+                          rowSpan={mergeInfo.rowSpan}
                           style={{
                             padding: 4,
                             borderLeft: "1px solid #e9ebf0",
@@ -787,6 +921,20 @@ export default function Schedule() {
                                       style={{ fontSize: 10, opacity: 0.85 }}
                                     >
                                       {s.room.name}
+                                    </div>
+                                  )}
+                                  {isMerged && (
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        opacity: 0.8,
+                                        marginTop: 2,
+                                        paddingTop: 2,
+                                        borderTop:
+                                          "1px solid rgba(255,255,255,0.3)",
+                                      }}
+                                    >
+                                      {mergeInfo.rowSpan} blocos consecutivos
                                     </div>
                                   )}
                                 </div>
