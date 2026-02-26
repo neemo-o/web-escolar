@@ -110,13 +110,14 @@ export default function Enrollments() {
   const LIMIT = 20;
 
   const load = useCallback(
-    async (p = 1) => {
+    async (p = 1, searchTerm = search) => {
       setLoading(true);
       try {
         const params = new URLSearchParams({
           page: String(p),
           limit: String(LIMIT),
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(searchTerm ? { search: searchTerm } : {}),
         });
         const res = await api.fetchJson(`/enrollments?${params}`);
         const data = res?.data ?? res ?? [];
@@ -129,7 +130,7 @@ export default function Enrollments() {
         setLoading(false);
       }
     },
-    [statusFilter],
+    [statusFilter, search],
   );
 
   useEffect(() => {
@@ -153,9 +154,12 @@ export default function Enrollments() {
         setClassrooms(
           (c?.data ?? c ?? []).map((x: any) => ({ id: x.id, name: x.name })),
         );
-        setYears(
-          (y?.data ?? y ?? []).map((x: any) => ({ id: x.id, year: x.year })),
+        // BUG-12: Filter years to show only EM_ANDAMENTO or PLANEJAMENTO
+        const filteredYears = (y?.data ?? y ?? []).filter(
+          (x: any) =>
+            x.status === "EM_ANDAMENTO" || x.status === "PLANEJAMENTO",
         );
+        setYears(filteredYears.map((x: any) => ({ id: x.id, year: x.year })));
       } catch {}
     }
     loadRefs();
@@ -169,7 +173,9 @@ export default function Enrollments() {
       }
       setLoadingFinancial(true);
       try {
-        const res = await api.fetchJson(`/students/${form.studentId}/guardians`);
+        const res = await api.fetchJson(
+          `/students/${form.studentId}/guardians`,
+        );
         const links = res?.data ?? [];
         const opts = (links as any[])
           .filter((l) => l?.isFinancialResponsible)
@@ -298,10 +304,13 @@ export default function Enrollments() {
     }
     setSaving(true);
     try {
-      const created = await api.fetchJson(`/enrollments/${selected.id}/documents`, {
-        method: "POST",
-        body: JSON.stringify(docForm),
-      });
+      const created = await api.fetchJson(
+        `/enrollments/${selected.id}/documents`,
+        {
+          method: "POST",
+          body: JSON.stringify(docForm),
+        },
+      );
       setDocs((s) => [...s, created]);
       setDocForm({ type: "", name: "", delivered: false, notes: "" });
       toast("Documento adicionado!");
@@ -603,7 +612,13 @@ export default function Enrollments() {
           <p style={{ margin: 0, color: "#6b7280" }}>Carregando...</p>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 18,
+              }}
+            >
               <div>
                 <p
                   style={{
@@ -623,7 +638,9 @@ export default function Enrollments() {
                     Nenhum documento cadastrado.
                   </p>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
                     {docs.map((d) => (
                       <div
                         key={d.id}
@@ -639,10 +656,22 @@ export default function Enrollments() {
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: "#111827",
+                            }}
+                          >
                             {d.name}
                           </div>
-                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              marginTop: 2,
+                            }}
+                          >
                             {String(d.type)}
                             {d.notes ? ` · ${d.notes}` : ""}
                           </div>
@@ -662,7 +691,9 @@ export default function Enrollments() {
                           <input
                             type="checkbox"
                             checked={!!d.delivered}
-                            onChange={(e) => toggleDocDelivered(d.id, e.target.checked)}
+                            onChange={(e) =>
+                              toggleDocDelivered(d.id, e.target.checked)
+                            }
                           />
                           Entregue
                         </label>
@@ -678,10 +709,23 @@ export default function Enrollments() {
                     borderTop: "1px solid #f1f5f9",
                   }}
                 >
-                  <p style={{ margin: "0 0 8px", fontSize: 12.5, fontWeight: 700, color: "#374151" }}>
+                  <p
+                    style={{
+                      margin: "0 0 8px",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: "#374151",
+                    }}
+                  >
                     Adicionar documento
                   </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "180px 1fr",
+                      gap: 10,
+                    }}
+                  >
                     <FormField label="Tipo" required>
                       <Select
                         value={docForm.type}
@@ -693,7 +737,9 @@ export default function Enrollments() {
                     <FormField label="Nome" required>
                       <input
                         value={docForm.name}
-                        onChange={(e) => setDocForm((f) => ({ ...f, name: e.target.value }))}
+                        onChange={(e) =>
+                          setDocForm((f) => ({ ...f, name: e.target.value }))
+                        }
                         style={{
                           width: "100%",
                           height: 40,
@@ -733,7 +779,9 @@ export default function Enrollments() {
                     Sem registros.
                   </p>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
                     {history.map((h) => (
                       <div
                         key={h.id}
@@ -744,13 +792,31 @@ export default function Enrollments() {
                           background: "#fff",
                         }}
                       >
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#111827" }}>
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: "#111827",
+                          }}
+                        >
                           {String(h.type)}
                         </div>
-                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
                           {h.description || "—"}
                         </div>
-                        <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 6 }}>
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: "#9ca3af",
+                            marginTop: 6,
+                          }}
+                        >
                           {String(h.createdAt).slice(0, 19).replace("T", " ")}
                           {h.createdBy?.name ? ` · ${h.createdBy.name}` : ""}
                         </div>

@@ -339,6 +339,8 @@ export default function Classrooms() {
           loadClassroomTeachers(c.id);
           setAddTeacherId("");
           setAddSubjectId("");
+          setAddTeacherId("");
+          setAddSubjectId("");
           setModal("teachers");
         }}
         title="Professores"
@@ -512,7 +514,7 @@ export default function Classrooms() {
             <Select
               value={form.academicYearId}
               onChange={(v) => setForm((f) => ({ ...f, academicYearId: v }))}
-              options={activeYearOptions}
+              options={yearFilterOptions}
               placeholder="Selecione..."
             />
           </FormField>
@@ -612,7 +614,10 @@ export default function Classrooms() {
               <Select
                 value={addSubjectId}
                 onChange={setAddSubjectId}
-                options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+                options={classroomSubjects.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                }))}
                 placeholder="Selecione a disciplina..."
               />
             </div>

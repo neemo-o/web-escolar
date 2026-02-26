@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 
 const accent = "var(--school-primary, #0891b2)";
+const sidebarColor = "var(--school-sidebar, #0e7490)";
 
 export function PageShell({
   title,
@@ -106,7 +107,7 @@ export function PrimaryButton({
       background:
         disabled || loading
           ? "#e5e7eb"
-          : `linear-gradient(135deg, ${accent}, #0e7490)`,
+          : `linear-gradient(135deg, ${accent}, ${sidebarColor})`,
       color: disabled || loading ? "#9ca3af" : "#fff",
       border: "none",
       boxShadow:

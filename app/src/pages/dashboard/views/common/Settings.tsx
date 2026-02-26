@@ -8,7 +8,7 @@ import {
   toast,
 } from "../../../../components/ui";
 
-const accent = "#0891b2";
+const accent = "var(--school-primary, #0891b2)";
 
 function Toggle({
   value,
@@ -437,7 +437,13 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 14,
+              }}
+            >
               <PrimaryButton onClick={saveTheme} loading={themeSaving}>
                 Salvar tema
               </PrimaryButton>

@@ -271,6 +271,7 @@ function StudentDetailModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+  const [loadingFullData, setLoadingFullData] = useState(false);
 
   // health
   const [health, setHealth] = useState<Health>({});
@@ -308,9 +309,24 @@ function StudentDetailModal({
   const [history, setHistory] = useState<Movement[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // BUG-01 & BUG-02: Fetch full student data on mount
   useEffect(() => {
-    setForm({ ...emptyForm(), ...(student as any) });
-  }, [student]);
+    async function loadFullStudentData() {
+      setLoadingFullData(true);
+      try {
+        const data = await api.fetchJson(`/students/${student.id}`);
+        if (data) {
+          setForm({ ...emptyForm(), ...data });
+        }
+      } catch (e) {
+        // Fallback to list data if API fails
+        setForm({ ...emptyForm(), ...(student as any) });
+      } finally {
+        setLoadingFullData(false);
+      }
+    }
+    loadFullStudentData();
+  }, [student.id]);
 
   useEffect(() => {
     if (tab === "saude" && !health.allergies && !healthLoading) loadHealth();
@@ -413,8 +429,8 @@ function StudentDetailModal({
           name: form.name,
           socialName: form.socialName || undefined,
           ...(canSeeCpf ? { cpf: form.cpf || undefined } : {}),
-          rg: form.rg || undefined,
-          birthCertificate: form.birthCertificate || undefined,
+          rg: form.rg ?? null,
+          birthCertificate: form.birthCertificate ?? null,
           birthDate: form.birthDate || undefined,
           gender: form.gender || undefined,
           nationality: form.nationality || undefined,
