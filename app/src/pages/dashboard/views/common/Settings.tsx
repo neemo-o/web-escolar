@@ -7,6 +7,7 @@ import {
   PrimaryButton,
   toast,
 } from "../../../../components/ui";
+import AvatarUpload from "../components/AvatarUpload";
 
 const accent = "var(--school-primary, #0891b2)";
 
@@ -373,6 +374,31 @@ export default function Settings() {
             description="Defina as cores principais usadas no sistema (por escola)."
           />
           <div style={{ padding: "16px 20px" }}>
+            {/* Logo Upload */}
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 10,
+                }}
+              >
+                Logo da escola
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <AvatarUpload
+                  currentUrl={school?.config?.logoUrl}
+                  name={school?.name || "Escola"}
+                  uploadUrl="/upload/logo/school/me"
+                  onSuccess={async () => {
+                    await refreshSchool();
+                  }}
+                  size={100}
+                />
+              </div>
+            </div>
+
             <div
               style={{
                 display: "grid",

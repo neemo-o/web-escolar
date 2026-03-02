@@ -10,6 +10,7 @@ import {
   InlineAlert,
   toast,
 } from "../../../../components/ui";
+import AvatarUpload from "../components/AvatarUpload";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN_GLOBAL: "Administrador Global",
@@ -27,7 +28,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function Profile() {
-  const { user, school } = useAuth();
+  const { user, school, refreshUser } = useAuth();
   const role = user?.role || "";
   const color = ROLE_COLORS[role] || "#6366f1";
 
@@ -83,6 +84,13 @@ export default function Profile() {
     }
   }
 
+  async function handleAvatarSuccess(newUrl: string) {
+    await refreshUser();
+  }
+
+  // Only allow avatar upload for non-STUDENT roles
+  const canUploadAvatar = role && !["STUDENT"].includes(role);
+
   return (
     <PageShell
       title="Meu Perfil"
@@ -99,37 +107,47 @@ export default function Profile() {
             flexWrap: "wrap",
           }}
         >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: `linear-gradient(135deg, ${color}, ${color}99)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              fontWeight: 800,
-              fontSize: 26,
-              letterSpacing: "0.5px",
-            }}
-          >
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.name}
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              initials
-            )}
-          </div>
+          {canUploadAvatar ? (
+            <AvatarUpload
+              currentUrl={user?.avatarUrl}
+              name={user?.name || "Usuário"}
+              uploadUrl="/upload/avatar/me"
+              onSuccess={handleAvatarSuccess}
+              size={72}
+            />
+          ) : (
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                flexShrink: 0,
+                background: `linear-gradient(135deg, ${color}, ${color}99)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: 26,
+                letterSpacing: "0.5px",
+              }}
+            >
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                initials
+              )}
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2
               style={{

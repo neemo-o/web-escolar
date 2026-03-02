@@ -1,12 +1,19 @@
 import React from "react";
 
-export function SchoolLogo({ name }: { name: string }) {
+export function SchoolLogo({
+  name,
+  logoUrl,
+}: {
+  name: string;
+  logoUrl?: string | null;
+}) {
   const initials = name
     .split(" ")
     .slice(0, 2)
     .map((n) => n[0])
     .join("")
     .toUpperCase();
+
   return (
     <div
       style={{
@@ -16,30 +23,57 @@ export function SchoolLogo({ name }: { name: string }) {
         gap: 8,
       }}
     >
-      <div
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: 14,
-          background: "rgba(255,255,255,0.18)",
-          border: "1.5px solid rgba(255,255,255,0.22)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backdropFilter: "blur(4px)",
-        }}
-      >
-        <span
+      {logoUrl ? (
+        <div
           style={{
-            color: "#fff",
-            fontWeight: 800,
-            fontSize: 18,
-            letterSpacing: "-0.5px",
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.18)",
+            border: "1.5px solid rgba(255,255,255,0.22)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(4px)",
+            overflow: "hidden",
           }}
         >
-          {initials}
-        </span>
-      </div>
+          <img
+            src={logoUrl}
+            alt={name}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.18)",
+            border: "1.5px solid rgba(255,255,255,0.22)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <span
+            style={{
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 18,
+              letterSpacing: "-0.5px",
+            }}
+          >
+            {initials}
+          </span>
+        </div>
+      )}
       <div style={{ textAlign: "center" }}>
         <div
           style={{

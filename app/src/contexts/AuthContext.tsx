@@ -15,6 +15,7 @@ type AuthContextType = {
   sessionExpiresAtMs: number | null;
   sessionSecondsRemaining: number | null;
   refreshSchool: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
@@ -166,8 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           if (schoolData.status === "fulfilled") {
             setSchool(schoolData.value);
             applySchoolTheme(schoolData.value);
-          }
-          else setSchool(null);
+          } else setSchool(null);
         }
 
         if (mounted && data.status !== "fulfilled") {
@@ -229,6 +229,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch {}
   };
 
+  const refreshUser = async () => {
+    if (!token) return;
+    try {
+      const u = await api.fetchJson("/auth/me");
+      setUser(u);
+    } catch {}
+  };
+
   // listen to global auth:logout events (dispatched by fetchJson on 401)
   useEffect(() => {
     function onExternalLogout() {
@@ -257,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         sessionExpiresAtMs,
         sessionSecondsRemaining,
         refreshSchool,
+        refreshUser,
         login,
         logout,
         // only consider authenticated when not loading and user+token present

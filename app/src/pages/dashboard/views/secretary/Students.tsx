@@ -21,6 +21,7 @@ import {
   InlineAlert,
   toast,
 } from "../../../../components/ui";
+import AvatarUpload from "../components/AvatarUpload";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -591,6 +592,23 @@ function StudentDetailModal({
               <InlineAlert message={err} type="error" />
             </div>
           )}
+
+          {/* Avatar Upload */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: 20,
+            }}
+          >
+            <AvatarUpload
+              currentUrl={form.avatarUrl}
+              name={form.name || "Aluno"}
+              uploadUrl={`/upload/avatar/student/${student.id}`}
+              onSuccess={(url) => setF({ avatarUrl: url })}
+              size={100}
+            />
+          </div>
 
           <SectionTitle>Dados pessoais</SectionTitle>
           <div
@@ -1819,29 +1837,69 @@ export default function Students() {
   const { user } = useAuth();
   const canSeeCpf = user?.role === "SECRETARY";
 
+  // Helper to get initials
+  function getInitials(name: string): string {
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
   const columns = [
     {
       key: "name",
       label: "Aluno",
       render: (row: Student) => (
-        <div>
-          <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
-            {row.name}
-            {row.socialName ? (
-              <span style={{ color: "#6b7280", fontWeight: 400 }}>
-                {" "}
-                ({row.socialName})
-              </span>
-            ) : null}
-          </p>
-          <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-            {canSeeCpf && row.maskedCpf ? (
-              <span style={{ fontFamily: "monospace" }}>
-                {row.maskedCpf} ·{" "}
-              </span>
-            ) : null}
-            {row.phone ? row.phone : "—"}
-          </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {row.avatarUrl ? (
+            <img
+              src={row.avatarUrl}
+              alt={row.name}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "#e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+                fontSize: 13,
+                color: "#64748b",
+              }}
+            >
+              {getInitials(row.name)}
+            </div>
+          )}
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
+              {row.name}
+              {row.socialName ? (
+                <span style={{ color: "#6b7280", fontWeight: 400 }}>
+                  {" "}
+                  ({row.socialName})
+                </span>
+              ) : null}
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+              {canSeeCpf && row.maskedCpf ? (
+                <span style={{ fontFamily: "monospace" }}>
+                  {row.maskedCpf} ·{" "}
+                </span>
+              ) : null}
+              {row.phone ? row.phone : "—"}
+            </p>
+          </div>
         </div>
       ),
     },

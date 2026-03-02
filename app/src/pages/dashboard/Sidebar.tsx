@@ -106,12 +106,19 @@ export default function Sidebar({
             pointerEvents: "none",
           }}
         />
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
           <SchoolLogo
             name={
               school?.name ??
               (role === "ADMIN_GLOBAL" ? "Sistema Global" : "Colégio")
             }
+            logoUrl={school?.config?.logoUrl}
           />
         </div>
       </div>

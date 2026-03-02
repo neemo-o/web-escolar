@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
+import path from "path";
 import schoolsRoutes from "./modules/schools/schools.routes";
 import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
@@ -22,24 +23,42 @@ import schedulesRoutes from "./modules/schedules/schedules.routes";
 import timeBlocksRoutes from "./modules/time-blocks/time-blocks.routes";
 import roomsRoutes from "./modules/rooms/rooms.routes";
 import documentsRoutes from "./modules/documents/documents.routes";
+import uploadRoutes from "./modules/upload/upload.routes";
 import { authenticate } from "./middlewares/authenticate";
 import { requireActiveSchool } from "./middlewares/requireActiveSchool";
 import { requireTenantMatch } from "./middlewares/tenant";
 
-
 const app = express();
+
+// Configure upload directory
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
 
 // global body parser with reasonable limit
 app.use(express.json({ limit: "100kb" }));
 
 // security and CORS middlewares
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 const corsOrigin = process.env.CORS_ORIGIN;
 if (!corsOrigin) {
   console.error("FATAL: CORS_ORIGIN não configurado");
   process.exit(1);
 }
 app.use(cors({ origin: corsOrigin, credentials: true }));
+
+// Serve uploaded files statically with CORS headers
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(UPLOAD_DIR),
+);
 
 // Public routes that must run before tenant middlewares
 app.use(schoolsRoutes);
@@ -51,6 +70,7 @@ app.use(requireActiveSchool);
 app.use(requireTenantMatch);
 
 // Routes that require authentication/tenant
+app.use(uploadRoutes);
 app.use(academicYearsRoutes);
 app.use(periodsRoutes);
 app.use(gradeLevelsRoutes);
