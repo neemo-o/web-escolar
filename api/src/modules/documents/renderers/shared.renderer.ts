@@ -7,6 +7,10 @@ export type DocConfig = {
   showLogo: boolean;
   headerHtml?: string | null;
   footerHtml?: string | null;
+  footerDefault?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  contactEmail?: string | null;
   directorName?: string | null;
   directorTitle?: string | null;
   schoolName: string;
@@ -48,6 +52,12 @@ export async function loadSchoolConfig(schoolId: string): Promise<DocConfig> {
         displayName: true,
         directorName: true,
         directorTitle: true,
+        headerHtml: true,
+        footerHtml: true,
+        footerDefault: true,
+        address: true,
+        phone: true,
+        contactEmail: true,
       },
     }),
   ]);
@@ -58,8 +68,12 @@ export async function loadSchoolConfig(schoolId: string): Promise<DocConfig> {
     directorName: config?.directorName ?? null,
     directorTitle: config?.directorTitle ?? "Diretor(a)",
     showLogo: true,
-    headerHtml: null,
-    footerHtml: null,
+    headerHtml: config?.headerHtml ?? null,
+    footerHtml: config?.footerHtml ?? null,
+    footerDefault: config?.footerDefault ?? null,
+    address: config?.address ?? null,
+    phone: config?.phone ?? null,
+    contactEmail: config?.contactEmail ?? null,
   };
 }
 

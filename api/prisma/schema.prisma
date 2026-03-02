@@ -215,6 +215,8 @@ model SchoolConfig {
   phone          String?  @db.VarChar(50)
   contactEmail   String?  @db.VarChar(150)
   website        String?  @db.VarChar(150)
+  headerHtml     String?  @db.Text
+  footerHtml     String?  @db.Text
 
   updatedAt DateTime @updatedAt
 

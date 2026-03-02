@@ -260,7 +260,7 @@ function FreeEmitTab() {
     <div style={{ display: "flex", gap: 4 }}>
       {doc.status === "RASCUNHO" && (
         <IconButton
-          icon={<EditIcon />}
+          icon="edit"
           title="Editar"
           onClick={() => {
             setSelected(doc);
@@ -269,7 +269,7 @@ function FreeEmitTab() {
         />
       )}
       <IconButton
-        icon={<EyeIcon />}
+        icon="view"
         title="Ver"
         onClick={() => {
           setSelected(doc);
@@ -278,13 +278,13 @@ function FreeEmitTab() {
       />
       {doc.status === "EMITIDO" && (
         <IconButton
-          icon={<DownloadIcon />}
+          icon="download"
           title="Baixar PDF"
           onClick={() => downloadPdf(doc.id, doc.title)}
         />
       )}
       <IconButton
-        icon={<TrashIcon />}
+        icon="delete"
         title="Cancelar"
         onClick={() => {
           setSelected(doc);
@@ -1728,7 +1728,7 @@ function IssuedTab() {
     </span>,
     <div style={{ display: "flex", gap: 4 }}>
       <IconButton
-        icon={<EyeIcon />}
+        icon="view"
         title="Ver"
         onClick={() => {
           setSelected(doc);
@@ -1737,7 +1737,7 @@ function IssuedTab() {
       />
       {doc.status !== "CANCELADO" && (
         <IconButton
-          icon={<DownloadIcon />}
+          icon="download"
           title="Baixar PDF"
           onClick={() => downloadPdf(doc.id, doc.title)}
         />
@@ -1854,10 +1854,11 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
     phone: "",
     contactEmail: "",
     website: "",
-    footerDefault: "",
     directorName: "",
     directorTitle: "Diretor(a)",
     logoUrl: "",
+    headerHtml: "",
+    footerHtml: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1873,10 +1874,11 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
             phone: cfg.phone ?? "",
             contactEmail: cfg.contactEmail ?? "",
             website: cfg.website ?? "",
-            footerDefault: cfg.footerDefault ?? "",
             directorName: cfg.directorName ?? "",
             directorTitle: cfg.directorTitle ?? "Diretor(a)",
             logoUrl: cfg.logoUrl ?? "",
+            headerHtml: cfg.headerHtml ?? "",
+            footerHtml: cfg.footerHtml ?? "",
           });
       })
       .catch(() => {})
@@ -1908,6 +1910,16 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
 
   const setF = (p: any) => setForm((f) => ({ ...f, ...p }));
 
+  const SCHOOL_VARS = [
+    { label: "Nome da escola", value: "{{escola.nome}}" },
+    { label: "Endereço", value: "{{escola.endereco}}" },
+    { label: "Telefone", value: "{{escola.telefone}}" },
+    { label: "E-mail", value: "{{escola.email}}" },
+    { label: "Site", value: "{{escola.site}}" },
+    { label: "Diretor(a)", value: "{{escola.diretor}}" },
+    { label: "Data atual", value: "{{data.hoje}}" },
+  ];
+
   return (
     <div>
       <div
@@ -1921,14 +1933,29 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
           color: "#4338ca",
         }}
       >
-        Estas informações aparecem no cabeçalho e rodapé de todos os documentos
-        emitidos pela escola.
+        Configure as informações e o layout padrão do cabeçalho e rodapé dos
+        documentos emitidos.
       </div>
-      <FormField label="Nome de exibição da escola">
+
+      {/* Dados da escola */}
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#374151",
+          marginBottom: 8,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        Dados da Escola
+      </div>
+      <FormField label="Nome de exibição">
         <input
           value={form.displayName}
           onChange={(e) => setF({ displayName: e.target.value })}
           style={inputStyle}
+          placeholder="Nome oficial para documentos"
         />
       </FormField>
       <FormField label="URL do Logo">
@@ -1954,7 +1981,7 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
             style={inputStyle}
           />
         </FormField>
-        <FormField label="E-mail de contato">
+        <FormField label="E-mail">
           <input
             value={form.contactEmail}
             onChange={(e) => setF({ contactEmail: e.target.value })}
@@ -1968,7 +1995,7 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
             style={inputStyle}
           />
         </FormField>
-        <FormField label="Cargo do Diretor(a)">
+        <FormField label="Cargo">
           <input
             value={form.directorTitle}
             onChange={(e) => setF({ directorTitle: e.target.value })}
@@ -1976,19 +2003,113 @@ function SchoolDocumentConfig({ onClose }: { onClose: () => void }) {
           />
         </FormField>
       </div>
-      <FormField label="Rodapé padrão dos documentos">
-        <textarea
-          value={form.footerDefault}
-          onChange={(e) => setF({ footerDefault: e.target.value })}
-          style={{
-            ...inputStyle,
-            height: "auto",
-            minHeight: 60,
-            resize: "vertical",
-          }}
-          placeholder="Ex: Documento emitido pela Secretaria. Este documento tem validade oficial."
-        />
-      </FormField>
+
+      {/* Cabeçalho customizável */}
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#374151",
+          margin: "16px 0 8px",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        Cabeçalho dos Documentos
+      </div>
+      <div
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 6,
+          padding: "8px 12px",
+          marginBottom: 8,
+          fontSize: 11,
+          color: "#6b7280",
+        }}
+      >
+        Deixe em branco para usar o cabeçalho automático com logo e dados da
+        escola. Use variáveis:&nbsp;
+        {SCHOOL_VARS.slice(0, 4).map((v) => (
+          <code
+            key={v.value}
+            style={{
+              background: "#e0e7ff",
+              color: "#4338ca",
+              borderRadius: 3,
+              padding: "1px 5px",
+              margin: "0 2px",
+              cursor: "pointer",
+              fontSize: 10,
+            }}
+            onClick={() =>
+              setF({ headerHtml: (form.headerHtml || "") + v.value })
+            }
+          >
+            {v.value}
+          </code>
+        ))}
+      </div>
+      <RichEditor
+        value={form.headerHtml}
+        onChange={(v) => setF({ headerHtml: v })}
+        minHeight={80}
+        placeholder="Cabeçalho personalizado (opcional)..."
+      />
+
+      {/* Rodapé customizável */}
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#374151",
+          margin: "16px 0 8px",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        Rodapé dos Documentos
+      </div>
+      <div
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 6,
+          padding: "8px 12px",
+          marginBottom: 8,
+          fontSize: 11,
+          color: "#6b7280",
+        }}
+      >
+        Texto exibido no rodapé de todos os documentos. Variáveis
+        disponíveis:&nbsp;
+        {SCHOOL_VARS.map((v) => (
+          <code
+            key={v.value}
+            style={{
+              background: "#e0e7ff",
+              color: "#4338ca",
+              borderRadius: 3,
+              padding: "1px 5px",
+              margin: "0 2px",
+              cursor: "pointer",
+              fontSize: 10,
+            }}
+            onClick={() =>
+              setF({ footerHtml: (form.footerHtml || "") + v.value })
+            }
+          >
+            {v.value}
+          </code>
+        ))}
+      </div>
+      <RichEditor
+        value={form.footerHtml}
+        onChange={(v) => setF({ footerHtml: v })}
+        minHeight={60}
+        placeholder="Ex: Documento emitido pela Secretaria de {{escola.nome}}. Válido mediante assinatura."
+      />
+
       <ModalFooter>
         <PrimaryButton variant="ghost" onClick={onClose}>
           Cancelar
@@ -2167,17 +2288,17 @@ function TemplatesTab() {
     />,
     <div style={{ display: "flex", gap: 4 }}>
       <IconButton
-        icon={<EditIcon />}
+        icon="edit"
         title="Editar"
         onClick={() => openEdit(item)}
       />
       <IconButton
-        icon={<CopyIcon />}
+        icon="copy"
         title="Duplicar"
         onClick={() => handleDuplicate(item.id)}
       />
       <IconButton
-        icon={<TrashIcon />}
+        icon="delete"
         title="Remover"
         onClick={() => {
           setSelected(item);

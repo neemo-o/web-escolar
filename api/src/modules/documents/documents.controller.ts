@@ -49,10 +49,23 @@ async function resolveBodyVars(
   enrollmentId: string | null,
   schoolId: string,
 ): Promise<string> {
+  const schoolCfgForVars = await (prisma as any).schoolConfig.findFirst({
+    where: { schoolId },
+    select: {
+      displayName: true,
+      address: true,
+      phone: true,
+      contactEmail: true,
+      website: true,
+      directorName: true,
+    },
+  });
   const school = await prisma.school.findFirst({
     where: { id: schoolId },
-    include: { config: true },
+    select: { name: true },
   });
+
+
 
   const vars: Record<string, string> = {
     "{{aluno.nome}}": "—",
@@ -66,11 +79,10 @@ async function resolveBodyVars(
     "{{turma.turno}}": "—",
     "{{ano.letivo}}": "—",
     "{{responsavel.nome}}": "—",
-    "{{escola.nome}}": school?.name ?? "—",
-    "{{escola.endereco}}": (school?.config as any)?.address ?? "—",
-    "{{escola.telefone}}": (school?.config as any)?.phone ?? "—",
-    "{{diretor.nome}}": (school?.config as any)?.directorName ?? "—",
-    "{{diretor.cargo}}": (school?.config as any)?.directorTitle ?? "Diretor(a)",
+    "{{escola.nome}}": schoolCfgForVars?.displayName || school?.name || "—",
+    "{{escola.endereco}}": schoolCfgForVars?.address ?? "—",
+    "{{escola.telefone}}": schoolCfgForVars?.phone ?? "—",
+    "{{diretor.nome}}": schoolCfgForVars?.directorName ?? "—",
     "{{data}}": new Date().toLocaleDateString("pt-BR"),
     "{{data.hoje}}": new Date().toLocaleDateString("pt-BR"),
     "{{data.extenso}}": new Date().toLocaleDateString("pt-BR", {
@@ -889,6 +901,8 @@ export async function updateSchoolDocumentConfig(req: Request, res: Response) {
     directorTitle,
     displayName,
     logoUrl,
+    headerHtml,
+    footerHtml,
   } = req.body;
 
   const data: any = {};
@@ -901,6 +915,8 @@ export async function updateSchoolDocumentConfig(req: Request, res: Response) {
   if (directorTitle !== undefined) data.directorTitle = directorTitle || null;
   if (displayName !== undefined) data.displayName = displayName || null;
   if (logoUrl !== undefined) data.logoUrl = logoUrl || null;
+  if (headerHtml !== undefined) data.headerHtml = headerHtml || null;
+  if (footerHtml !== undefined) data.footerHtml = footerHtml || null;
 
   const updated = await p.schoolConfig.upsert({
     where: { schoolId },
@@ -909,7 +925,6 @@ export async function updateSchoolDocumentConfig(req: Request, res: Response) {
   });
   return res.json(updated);
 }
-
 // ─── FREE PDF Renderer ─────────────────────────────────────────────────────────
 
 async function renderFreeDocumentPdf(
@@ -919,18 +934,32 @@ async function renderFreeDocumentPdf(
   docId: string,
 ) {
   const schoolCfg = await loadSchoolConfig(schoolId);
+  
   const showLogo = item.template?.showLogo ?? true;
 
   const bodyHtml = item.resolvedBody ?? item.bodySnapshot ?? "";
-  const headerHtml = item.resolvedHeader ?? item.headerSnapshot ?? "";
-  const footerHtml = item.resolvedFooter ?? item.footerSnapshot ?? "";
+ const headerHtml =
+   item.resolvedHeader ??
+   item.headerSnapshot ??
+   (schoolCfg as any).headerHtml ??
+   "";
+ const footerHtml =
+   item.resolvedFooter ??
+   item.footerSnapshot ??
+   (schoolCfg as any).footerHtml ??
+   "";
   const signatures: string[] = Array.isArray(item.signatureLines)
     ? item.signatureLines.map((s: any) =>
         typeof s === "string" ? s : (s.label ?? ""),
       )
     : [];
 
-  const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: true });
+  const doc = new PDFDocument({
+    size: "A4",
+    margin: 50,
+    autoFirstPage: true,
+    bufferPages: true
+  });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
@@ -1015,47 +1044,112 @@ async function renderFreeDocumentPdf(
   }
 
   // ─── Footer
-  const footerText = footerHtml.trim()
-    ? stripHtml(footerHtml)
-    : ((schoolCfg as any).footerDefault ?? null);
+ if (signatures.length > 0) {
+   const sigSpace = 80;
+   const footerSafeY = doc.page.height - 120;
+   if (doc.y + sigSpace > footerSafeY) {
+     // sem espaço suficiente, não adiciona moveDown extra
+   } else {
+     doc.moveDown(3);
+   }
+   drawSignatureLines(doc, signatures);
+ }
 
-  const footerY = doc.page.height - 65;
-  doc
-    .moveTo(marginL, footerY)
-    .lineTo(pageW - marginR, footerY)
-    .strokeColor("#e5e7eb")
-    .lineWidth(0.5)
-    .stroke();
-  doc
-    .font("Helvetica")
-    .fontSize(8)
-    .fillColor("#9ca3af")
-    .text(
-      `ID: ${docId.slice(0, 8).toUpperCase()} · Emitido em ${new Date().toLocaleDateString("pt-BR")}`,
-      marginL,
-      footerY + 6,
-      { width: contentW / 2, align: "left" },
-    );
-  if (footerText) {
+ // ─── Footer (posição absoluta na página atual)
+ const footerText = footerHtml.trim()
+   ? stripHtml(footerHtml)
+   : ((schoolCfg as any).footerDefault ??
+     ((schoolCfg as any).footerHtml
+       ? stripHtml((schoolCfg as any).footerHtml)
+       : null));
+
+ const footerY = doc.page.height - 65;
+
+ // Garantir que o cursor não ultrapasse a área do footer
+ if (doc.y > footerY - 10) {
+   // conteúdo já passou da área do footer — não faz nada, footer fica sobreposto
+   // (alternativa: adicionar página, mas isso causaria a 2ª página desnecessária)
+ }
+
+ doc
+   .moveTo(marginL, footerY)
+   .lineTo(pageW - marginR, footerY)
+   .strokeColor("#e5e7eb")
+   .lineWidth(0.5)
+   .stroke();
+
+ doc
+   .font("Helvetica")
+   .fontSize(8)
+   .fillColor("#9ca3af")
+   .text(
+     `ID: ${docId.slice(0, 8).toUpperCase()} · Emitido em ${new Date().toLocaleDateString("pt-BR")}`,
+     marginL,
+     footerY + 6,
+     { width: contentW / 2, align: "left" },
+   );
+ if (footerText) {
+   doc
+     .font("Helvetica")
+     .fontSize(8)
+     .fillColor("#6b7280")
+     .text(footerText, marginL + contentW / 2, footerY + 6, {
+       width: contentW / 2,
+       align: "right",
+     });
+ } else {
+   doc
+     .font("Helvetica")
+     .fontSize(8)
+     .fillColor("#9ca3af")
+     .text(schoolCfg.schoolName, marginL + contentW / 2, footerY + 6, {
+       width: contentW / 2,
+       align: "right",
+     });
+ }
+
+  const pageCount = doc.bufferedPageRange().count;
+  for (let i = 0; i < pageCount; i++) {
+    doc.switchToPage(i);
+    const fY = doc.page.height - 65;
     doc
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor("#6b7280")
-      .text(footerText, marginL + contentW / 2, footerY + 6, {
-        width: contentW / 2,
-        align: "right",
-      });
-  } else {
+      .moveTo(marginL, fY)
+      .lineTo(pageW - marginR, fY)
+      .strokeColor("#e5e7eb")
+      .lineWidth(0.5)
+      .stroke();
     doc
       .font("Helvetica")
       .fontSize(8)
       .fillColor("#9ca3af")
-      .text(schoolCfg.schoolName, marginL + contentW / 2, footerY + 6, {
-        width: contentW / 2,
-        align: "right",
-      });
+      .text(
+        `ID: ${docId.slice(0, 8).toUpperCase()} · Emitido em ${new Date().toLocaleDateString("pt-BR")}`,
+        marginL,
+        fY + 6,
+        { width: contentW / 2, align: "left" },
+      );
+    if (footerText) {
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#6b7280")
+        .text(footerText, marginL + contentW / 2, fY + 6, {
+          width: contentW / 2,
+          align: "right",
+        });
+    } else {
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#9ca3af")
+        .text(schoolCfg.schoolName, marginL + contentW / 2, fY + 6, {
+          width: contentW / 2,
+          align: "right",
+        });
+    }
   }
 
+  doc.flushPages();
   doc.end();
 }
 
